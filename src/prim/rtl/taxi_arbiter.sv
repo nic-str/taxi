@@ -136,7 +136,7 @@ always_comb begin
     end
 end
 
-always_ff @(posedge clk) begin
+always @(posedge clk) begin // Fix for multi driver error
     grant_reg <= grant_next;
     grant_valid_reg <= grant_valid_next;
     grant_index_reg <= grant_index_next;

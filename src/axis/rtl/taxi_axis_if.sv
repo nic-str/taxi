@@ -10,9 +10,9 @@ Authors:
 
 interface taxi_axis_if #(
     // Width of AXI stream interfaces in bits
-    parameter DATA_W = 8,
+    parameter int DATA_W = 8,
     // tkeep signal width (bytes per cycle)
-    parameter KEEP_W = ((DATA_W+7)/8),
+    parameter int KEEP_W = ((DATA_W+7)/8),
     // Use tkeep signal
     parameter logic KEEP_EN = KEEP_W > 1,
     // Use tstrb signal
@@ -22,15 +22,15 @@ interface taxi_axis_if #(
     // Use tid signal
     parameter logic ID_EN = 0,
     // tid signal width
-    parameter ID_W = 8,
+    parameter int ID_W = 8,
     // Use tdest signal
     parameter logic DEST_EN = 0,
     // tdest signal width
-    parameter DEST_W = 8,
+    parameter int DEST_W = 8,
     // Use tuser signal
     parameter logic USER_EN = 0,
     // tuser signal width
-    parameter USER_W = 1
+    parameter int USER_W = 1
 )
 ();
     logic [DATA_W-1:0] tdata;

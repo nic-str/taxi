@@ -15,7 +15,21 @@ Authors:
 /*
  * AXI4-Stream bus width adapter
  */
-module taxi_axis_adapter
+module taxi_axis_adapter 
+
+`ifdef CADENCE
+// Cannot extract these parameters from interface for now
+#(
+    // Use tstrb signal
+    parameter logic STRB_EN = 1'b0,
+    // Use tlast signal
+    parameter logic LAST_EN = 1'b1,
+    // Use tid signal
+    parameter logic ID_EN = 0,
+    parameter logic DEST_EN = 0,
+    parameter logic USER_EN = 0
+)
+`endif
 (
     input  wire logic  clk,
     input  wire logic  rst,
@@ -31,7 +45,22 @@ module taxi_axis_adapter
     taxi_axis_if.src   m_axis
 );
 
-// extract parameters
+logic rst_n;
+assign rst_n = ~rst;
+
+// extract parameters from interface
+`ifdef CADENCE
+localparam S_DATA_W = $bits(s_axis.tdata);
+localparam S_KEEP_W = $bits(s_axis.tkeep);
+localparam logic S_KEEP_EN = S_KEEP_W > 1;
+localparam ID_W = $bits(s_axis.tid);
+localparam DEST_W = $bits(s_axis.tdest);
+localparam USER_W = $bits(s_axis.tuser);
+
+localparam M_DATA_W = $bits(m_axis.tdata);
+localparam M_KEEP_W = $bits(m_axis.tkeep);
+localparam logic M_KEEP_EN = M_KEEP_W>1;
+`else
 localparam S_DATA_W = s_axis.DATA_W;
 localparam logic S_KEEP_EN = s_axis.KEEP_EN;
 localparam S_KEEP_W = s_axis.KEEP_W;
@@ -47,6 +76,7 @@ localparam USER_W = s_axis.USER_W;
 localparam M_DATA_W = m_axis.DATA_W;
 localparam logic M_KEEP_EN = m_axis.KEEP_EN;
 localparam M_KEEP_W = m_axis.KEEP_W;
+`endif
 
 // force keep width to 1 when disabled
 localparam S_BYTE_LANES = S_KEEP_EN ? S_KEEP_W : 1;
@@ -64,7 +94,7 @@ if (M_BYTE_SIZE * M_BYTE_LANES != M_DATA_W)
     $fatal(0, "Error: output data width not evenly divisible (instance %m)");
 
 if (S_BYTE_SIZE != M_BYTE_SIZE)
-    $fatal(0, "Error: byte size mismatch (instance %m)");
+    $fatal(0, "Error: byte size mismatch (instance %m) %d %d",S_BYTE_SIZE,M_BYTE_SIZE);
 
 wire [S_KEEP_W-1:0] s_axis_tkeep_int = S_KEEP_EN ? s_axis.tkeep : '1;
 
@@ -93,6 +123,27 @@ end else if (M_BYTE_LANES > S_BYTE_LANES) begin : upsize
 
     localparam CL_SEG_COUNT = $clog2(SEG_COUNT);
 
+    `ifdef ASIC
+    logic [CL_SEG_COUNT-1:0] seg_reg;
+
+    logic [S_DATA_W-1:0] s_axis_tdata_reg;
+    logic [S_KEEP_W-1:0] s_axis_tkeep_reg;
+    logic [S_KEEP_W-1:0] s_axis_tstrb_reg;
+    logic s_axis_tvalid_reg;
+    logic s_axis_tlast_reg;
+    logic [ID_W-1:0] s_axis_tid_reg;
+    logic [DEST_W-1:0] s_axis_tdest_reg;
+    logic [USER_W-1:0] s_axis_tuser_reg;
+
+    logic [M_DATA_W-1:0] m_axis_tdata_reg;
+    logic [M_KEEP_W-1:0] m_axis_tkeep_reg;
+    logic [M_KEEP_W-1:0] m_axis_tstrb_reg;
+    logic m_axis_tvalid_reg;
+    logic m_axis_tlast_reg;
+    logic [ID_W-1:0] m_axis_tid_reg;
+    logic [DEST_W-1:0] m_axis_tdest_reg;
+    logic [USER_W-1:0] m_axis_tuser_reg;
+    `else
     logic [CL_SEG_COUNT-1:0] seg_reg = '0;
 
     logic [S_DATA_W-1:0] s_axis_tdata_reg = '0;
@@ -112,6 +163,7 @@ end else if (M_BYTE_LANES > S_BYTE_LANES) begin : upsize
     logic [ID_W-1:0] m_axis_tid_reg = '0;
     logic [DEST_W-1:0] m_axis_tdest_reg = '0;
     logic [USER_W-1:0] m_axis_tuser_reg = '0;
+    `endif
 
     assign s_axis.tready = !s_axis_tvalid_reg;
 
@@ -123,8 +175,17 @@ end else if (M_BYTE_LANES > S_BYTE_LANES) begin : upsize
     assign m_axis.tid    = ID_EN   ? m_axis_tid_reg   : '0;
     assign m_axis.tdest  = DEST_EN ? m_axis_tdest_reg : '0;
     assign m_axis.tuser  = USER_EN ? m_axis_tuser_reg : '0;
-
+    
+    `ifdef ASYNC_RES
+    always_ff @(posedge clk, negedge rst_n) begin
+        if(!rst_n) begin
+            seg_reg <= '0;
+            s_axis_tvalid_reg <= 1'b0;
+            m_axis_tvalid_reg <= 1'b0;
+        end else begin
+    `else
     always_ff @(posedge clk) begin
+    `endif
         m_axis_tvalid_reg <= m_axis_tvalid_reg && !m_axis.tready;
 
         if (!m_axis_tvalid_reg || m_axis.tready) begin
@@ -174,12 +235,15 @@ end else if (M_BYTE_LANES > S_BYTE_LANES) begin : upsize
             s_axis_tdest_reg <= s_axis.tdest;
             s_axis_tuser_reg <= s_axis.tuser;
         end
-
+        `ifdef ASYNC_RES
+        end
+        `else
         if (rst) begin
             seg_reg <= '0;
             s_axis_tvalid_reg <= 1'b0;
             m_axis_tvalid_reg <= 1'b0;
         end
+        `endif
     end
 
 end else begin : downsize
@@ -191,6 +255,25 @@ end else begin : downsize
     localparam SEG_DATA_W = S_DATA_W / SEG_COUNT;
     localparam SEG_KEEP_W = S_BYTE_LANES / SEG_COUNT;
 
+    `ifdef ASIC
+    logic [S_DATA_W-1:0] s_axis_tdata_reg;
+    logic [S_KEEP_W-1:0] s_axis_tkeep_reg;
+    logic [S_KEEP_W-1:0] s_axis_tstrb_reg;
+    logic s_axis_tvalid_reg;
+    logic s_axis_tlast_reg;
+    logic [ID_W-1:0] s_axis_tid_reg;
+    logic [DEST_W-1:0] s_axis_tdest_reg;
+    logic [USER_W-1:0] s_axis_tuser_reg;
+
+    logic [M_DATA_W-1:0] m_axis_tdata_reg;
+    logic [M_KEEP_W-1:0] m_axis_tkeep_reg;
+    logic [M_KEEP_W-1:0] m_axis_tstrb_reg;
+    logic m_axis_tvalid_reg;
+    logic m_axis_tlast_reg;
+    logic [ID_W-1:0] m_axis_tid_reg;
+    logic [DEST_W-1:0] m_axis_tdest_reg;
+    logic [USER_W-1:0] m_axis_tuser_reg;
+    `else
     logic [S_DATA_W-1:0] s_axis_tdata_reg = '0;
     logic [S_KEEP_W-1:0] s_axis_tkeep_reg = '0;
     logic [S_KEEP_W-1:0] s_axis_tstrb_reg = '0;
@@ -208,6 +291,7 @@ end else begin : downsize
     logic [ID_W-1:0] m_axis_tid_reg = '0;
     logic [DEST_W-1:0] m_axis_tdest_reg = '0;
     logic [USER_W-1:0] m_axis_tuser_reg = '0;
+    `endif
 
     assign s_axis.tready = !s_axis_tvalid_reg;
 
@@ -220,7 +304,15 @@ end else begin : downsize
     assign m_axis.tdest  = DEST_EN ? m_axis_tdest_reg : '0;
     assign m_axis.tuser  = USER_EN ? m_axis_tuser_reg : '0;
 
+    `ifdef ASYNC_RES
+    always_ff @(posedge clk, negedge rst_n) begin
+        if(!rst_n) begin
+            s_axis_tvalid_reg <= 1'b0;
+            m_axis_tvalid_reg <= 1'b0;
+        end else begin
+    `else
     always_ff @(posedge clk) begin
+    `endif
         m_axis_tvalid_reg <= m_axis_tvalid_reg && !m_axis.tready;
 
         if (!m_axis_tvalid_reg || m_axis.tready) begin
@@ -277,10 +369,14 @@ end else begin : downsize
             s_axis_tuser_reg <= s_axis.tuser;
         end
 
+        `ifdef ASYNC_RES
+        end
+        `else
         if (rst) begin
             s_axis_tvalid_reg <= 1'b0;
             m_axis_tvalid_reg <= 1'b0;
         end
+        `endif
     end
 
 end

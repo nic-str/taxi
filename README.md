@@ -1,5 +1,20 @@
 # Taxi Transport Library
 
+## Fork adding ASIC support
+
+* ASYNC reset option through ASYNC_RES define
+* Cadence compatible interface parameter extraction through CADENCE define
+
+### Currently supported modules
+**Prim**
+taxi_arbiter.sv
+**AXIS**
+taxi_axis_adapter.sv
+taxi_axis_arb_mux.sv
+
+
+
+
 [![Regression Tests](https://github.com/fpganinja/taxi/actions/workflows/regression-tests.yml/badge.svg)](https://github.com/fpganinja/taxi/actions/workflows/regression-tests.yml)
 
 The home of Corundum, Zircon, and XFCP, plus AXI, AXI stream, Ethernet, and PCIe components in System Verilog.

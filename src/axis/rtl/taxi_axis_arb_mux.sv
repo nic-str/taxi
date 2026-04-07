@@ -24,7 +24,15 @@ module taxi_axis_arb_mux #
     // select round robin arbitration
     parameter logic ARB_ROUND_ROBIN = 1'b0,
     // LSB priority selection
-    parameter logic ARB_LSB_HIGH_PRIO = 1'b1
+    parameter logic ARB_LSB_HIGH_PRIO = 1'b1,
+    // Use tstrb signal
+    parameter logic STRB_EN = 1'b0,
+    // Use tlast signal
+    parameter logic LAST_EN = 1'b1,
+    // Use tid signal
+    parameter logic ID_EN = 0,
+    parameter logic DEST_EN = 0,
+    parameter logic USER_EN = 0
 )
 (
     input  wire logic  clk,
@@ -41,29 +49,28 @@ module taxi_axis_arb_mux #
     taxi_axis_if.src   m_axis
 );
 
-// extract parameters
-localparam DATA_W = s_axis[0].DATA_W;
-localparam logic KEEP_EN = s_axis[0].KEEP_EN && m_axis.KEEP_EN;
-localparam KEEP_W = s_axis[0].KEEP_W;
-localparam logic STRB_EN = s_axis[0].STRB_EN && m_axis.STRB_EN;
-localparam logic LAST_EN = s_axis[0].LAST_EN && m_axis.LAST_EN;
-localparam logic ID_EN = s_axis[0].ID_EN && m_axis.ID_EN;
-localparam S_ID_W = s_axis[0].ID_W;
-localparam logic DEST_EN = s_axis[0].DEST_EN && m_axis.DEST_EN;
-localparam DEST_W = s_axis[0].DEST_W;
-localparam logic USER_EN = s_axis[0].USER_EN && m_axis.USER_EN;
-localparam USER_W = s_axis[0].USER_W;
+logic rst_n;
+assign rst_n = ~rst;
 
-localparam M_ID_W = m_axis.ID_W;
+// extract parameters
+localparam DATA_W = $bits(s_axis[0].tdata);
+
+localparam KEEP_W = $bits(s_axis[0].tkeep);
+localparam logic KEEP_EN = KEEP_W > 1;
+localparam S_ID_W = $bits(s_axis[0].tid);
+localparam DEST_W = $bits(s_axis[0].tdest);
+localparam USER_W = $bits(s_axis[0].tuser);
+
+localparam M_ID_W = $bits(m_axis.tid);
 
 localparam CL_S_COUNT = $clog2(S_COUNT);
 
 // check configuration
-if (m_axis.DATA_W != DATA_W)
-    $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
+if ($bits(m_axis.tdata) != DATA_W)
+    $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m) %d %d", $bits(m_axis.DATA_W), DATA_W);
 
-if (KEEP_EN && m_axis.KEEP_W != KEEP_W)
-    $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
+// if (KEEP_EN && m_axis.KEEP_W != KEEP_W)
+//     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
 
 if (UPDATE_TID) begin
     if (!ID_EN)
@@ -78,7 +85,7 @@ logic [DATA_W-1:0]  m_axis_tdata_int;
 logic [KEEP_W-1:0]  m_axis_tkeep_int;
 logic [KEEP_W-1:0]  m_axis_tstrb_int;
 logic               m_axis_tvalid_int;
-logic               m_axis_tready_int_reg = 1'b0;
+logic               m_axis_tready_int_reg;
 logic               m_axis_tlast_int;
 logic [M_ID_W-1:0]  m_axis_tid_int;
 logic [DEST_W-1:0]  m_axis_tdest_int;
@@ -111,6 +118,16 @@ end else begin
     wire [CL_S_COUNT-1:0] grant_index;
 
     // input registers to pipeline arbitration delay
+    `ifdef ASIC
+    logic [DATA_W-1:0]   s_axis_tdata_reg[S_COUNT];
+    logic [KEEP_W-1:0]   s_axis_tkeep_reg[S_COUNT];
+    logic [KEEP_W-1:0]   s_axis_tstrb_reg[S_COUNT];
+    logic [S_COUNT-1:0]  s_axis_tvalid_reg;
+    logic [S_COUNT-1:0]  s_axis_tlast_reg;
+    logic [S_ID_W-1:0]   s_axis_tid_reg[S_COUNT];
+    logic [DEST_W-1:0]   s_axis_tdest_reg[S_COUNT];
+    logic [USER_W-1:0]   s_axis_tuser_reg[S_COUNT];
+    `else
     logic [DATA_W-1:0]   s_axis_tdata_reg[S_COUNT] = '{S_COUNT{'0}};
     logic [KEEP_W-1:0]   s_axis_tkeep_reg[S_COUNT] = '{S_COUNT{'0}};
     logic [KEEP_W-1:0]   s_axis_tstrb_reg[S_COUNT] = '{S_COUNT{'0}};
@@ -119,6 +136,7 @@ end else begin
     logic [S_ID_W-1:0]   s_axis_tid_reg[S_COUNT] = '{S_COUNT{'0}};
     logic [DEST_W-1:0]   s_axis_tdest_reg[S_COUNT] = '{S_COUNT{'0}};
     logic [USER_W-1:0]   s_axis_tuser_reg[S_COUNT] = '{S_COUNT{'0}};
+    `endif
 
     // unpack interface array
     wire [S_COUNT-1:0]  s_axis_tvalid;
@@ -179,7 +197,14 @@ end else begin
     end
 
     for (genvar n = 0; n < S_COUNT; n = n + 1) begin
+        `ifdef ASYNC_RES
+        always_ff @(posedge clk, negedge rst_n) begin
+            if(!rst_n) begin
+                s_axis_tvalid_reg[n] <= 1'b0;
+            end else begin
+        `else
         always_ff @(posedge clk) begin
+        `endif
             // register inputs
             if (s_axis_tready[n]) begin
                 s_axis_tdata_reg[n] <= s_axis[n].tdata;
@@ -192,15 +217,38 @@ end else begin
                 s_axis_tuser_reg[n] <= s_axis[n].tuser;
             end
 
+            `ifdef ASYNC_RES
+            end
+            `else
             if (rst) begin
                 s_axis_tvalid_reg[n] <= 1'b0;
             end
+            `endif
         end
     end
 
 end
 
 // output datapath logic
+`ifdef ASIC
+logic [DATA_W-1:0] m_axis_tdata_reg;
+logic [KEEP_W-1:0] m_axis_tkeep_reg;
+logic [KEEP_W-1:0] m_axis_tstrb_reg;
+logic              m_axis_tvalid_reg, m_axis_tvalid_next;
+logic              m_axis_tlast_reg;
+logic [M_ID_W-1:0] m_axis_tid_reg  ;
+logic [DEST_W-1:0] m_axis_tdest_reg;
+logic [USER_W-1:0] m_axis_tuser_reg;
+
+logic [DATA_W-1:0] temp_m_axis_tdata_reg;
+logic [KEEP_W-1:0] temp_m_axis_tkeep_reg;
+logic [KEEP_W-1:0] temp_m_axis_tstrb_reg;
+logic              temp_m_axis_tvalid_reg, temp_m_axis_tvalid_next;
+logic              temp_m_axis_tlast_reg;
+logic [M_ID_W-1:0] temp_m_axis_tid_reg  ;
+logic [DEST_W-1:0] temp_m_axis_tdest_reg;
+logic [USER_W-1:0] temp_m_axis_tuser_reg;
+`else
 logic [DATA_W-1:0] m_axis_tdata_reg  = '0;
 logic [KEEP_W-1:0] m_axis_tkeep_reg  = '0;
 logic [KEEP_W-1:0] m_axis_tstrb_reg  = '0;
@@ -218,6 +266,7 @@ logic              temp_m_axis_tlast_reg  = 1'b0;
 logic [M_ID_W-1:0] temp_m_axis_tid_reg    = '0;
 logic [DEST_W-1:0] temp_m_axis_tdest_reg  = '0;
 logic [USER_W-1:0] temp_m_axis_tuser_reg  = '0;
+`endif
 
 // datapath control
 logic store_axis_int_to_output;
@@ -264,7 +313,16 @@ always_comb begin
     end
 end
 
+`ifdef ASYNC_RES
+always_ff @(posedge clk, negedge rst_n) begin
+    if(!rst_n) begin
+        m_axis_tvalid_reg <= 1'b0;
+        m_axis_tready_int_reg <= 1'b0;
+        temp_m_axis_tvalid_reg <= 1'b0;
+    end else begin
+`else
 always_ff @(posedge clk) begin
+`endif
     m_axis_tvalid_reg <= m_axis_tvalid_next;
     m_axis_tready_int_reg <= m_axis_tready_int_early;
     temp_m_axis_tvalid_reg <= temp_m_axis_tvalid_next;
@@ -297,12 +355,15 @@ always_ff @(posedge clk) begin
         temp_m_axis_tdest_reg <= m_axis_tdest_int;
         temp_m_axis_tuser_reg <= m_axis_tuser_int;
     end
-
+    `ifdef ASYNC_RES
+    end
+    `else
     if (rst) begin
         m_axis_tvalid_reg <= 1'b0;
         m_axis_tready_int_reg <= 1'b0;
         temp_m_axis_tvalid_reg <= 1'b0;
     end
+    `endif
 end
 
 endmodule
