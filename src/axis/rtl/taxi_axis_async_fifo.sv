@@ -55,7 +55,16 @@ module taxi_axis_async_fifo #
     // Enable pause request input
     parameter logic PAUSE_EN = 1'b0,
     // Pause between frames
-    parameter logic FRAME_PAUSE = FRAME_FIFO
+    parameter logic FRAME_PAUSE = FRAME_FIFO,
+
+    `ifdef CADENCE
+    parameter logic KEEP_EN = 1'b0,
+    parameter logic STRB_EN = 1'b0,
+    parameter logic LAST_EN = 1'b0,
+    parameter logic ID_EN = 1'b0,
+    parameter logic DEST_EN = 1'b0,
+    parameter logic USER_EN = 1'b0
+    `endif
 )
 (
     /*
@@ -95,7 +104,19 @@ module taxi_axis_async_fifo #
     output wire logic                    m_status_good_frame
 );
 
+logic m_rst_n, s_rst_n;
+assign m_rst_n = ~m_rst;
+assign s_rst_n = ~s_rst;
+
 // extract parameters
+`ifdef CADENCE
+localparam DATA_W = $bits(s_axis.tdata);
+localparam KEEP_W = $bits(s_axis.tkeep);
+localparam ID_W = $bits(s_axis.tid);
+localparam DEST_W = $bits(s_axis.tdest);
+localparam USER_W = $bits(s_axis.tuser);
+localparam S_USER_EN = USER_EN;
+`else
 localparam DATA_W = s_axis.DATA_W;
 localparam logic KEEP_EN = s_axis.KEEP_EN && m_axis.KEEP_EN;
 localparam KEEP_W = s_axis.KEEP_W;
@@ -105,8 +126,10 @@ localparam logic ID_EN = s_axis.ID_EN && m_axis.ID_EN;
 localparam ID_W = s_axis.ID_W;
 localparam logic DEST_EN = s_axis.DEST_EN && m_axis.DEST_EN;
 localparam DEST_W = s_axis.DEST_W;
-localparam logic USER_EN = s_axis.USER_EN && m_axis.USER_EN;
+localparam S_USER_EN = s_axis.USER_EN;
+localparam logic USER_EN = S_USER_EN && m_axis.USER_EN;
 localparam USER_W = s_axis.USER_W;
+`endif
 
 localparam CL_DEPTH = $clog2(DEPTH);
 localparam CL_KEEP_W = $clog2(KEEP_W);
@@ -136,17 +159,17 @@ if (MARK_WHEN_FULL && FRAME_FIFO)
 if (MARK_WHEN_FULL && !LAST_EN)
     $fatal(0, "Error: MARK_WHEN_FULL set requires LAST_EN set (instance %m)");
 
-if (m_axis.DATA_W != DATA_W)
+if ($bits(m_axis.tdata) != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
-if (KEEP_EN && m_axis.KEEP_W != KEEP_W)
+if (KEEP_EN && $bits(m_axis.tkeep) != KEEP_W)
     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
 
-if (DROP_BAD_FRAME && !s_axis.USER_EN)
+if (DROP_BAD_FRAME && !S_USER_EN)
     $fatal(0, "Error: DROP_BAD_FRAME set requires s_axis.USER_EN (instance %m)");
 
-if (MARK_WHEN_FULL && !m_axis.USER_EN)
-    $fatal(0, "Error: MARK_WHEN_FULL set requires m_axis.USER_EN (instance %m)");
+// if (MARK_WHEN_FULL && !m_axis.USER_EN)
+//     $fatal(0, "Error: MARK_WHEN_FULL set requires m_axis.USER_EN (instance %m)");
 
 localparam KEEP_OFFSET = DATA_W;
 localparam STRB_OFFSET = KEEP_OFFSET + (KEEP_EN ? KEEP_W : 0);
@@ -166,6 +189,42 @@ function [FIFO_AW:0] gray2bin(input [FIFO_AW:0] g);
     end
 endfunction
 
+`ifdef ASIC
+logic [FIFO_AW:0] wr_ptr_reg;
+logic [FIFO_AW:0] wr_ptr_commit_reg;
+logic [FIFO_AW:0] wr_ptr_gray_reg;
+logic [FIFO_AW:0] wr_ptr_sync_commit_reg;
+logic [FIFO_AW:0] rd_ptr_reg;
+logic [FIFO_AW:0] rd_ptr_gray_reg;
+logic [FIFO_AW:0] wr_ptr_conv_reg;
+logic [FIFO_AW:0] rd_ptr_conv_reg;
+
+logic [FIFO_AW:0] wr_ptr_temp;
+logic [FIFO_AW:0] rd_ptr_temp;
+
+logic [FIFO_AW:0] wr_ptr_gray_sync1_reg;
+logic [FIFO_AW:0] wr_ptr_gray_sync2_reg;
+logic [FIFO_AW:0] wr_ptr_commit_sync_reg;
+logic [FIFO_AW:0] rd_ptr_gray_sync1_reg;
+logic [FIFO_AW:0] rd_ptr_gray_sync2_reg;
+
+logic wr_ptr_update_valid_reg;
+logic wr_ptr_update_reg;
+logic wr_ptr_update_sync1_reg;
+logic wr_ptr_update_sync2_reg;
+logic wr_ptr_update_sync3_reg;
+logic wr_ptr_update_ack_sync1_reg;
+logic wr_ptr_update_ack_sync2_reg;
+
+wire s_rst_sync;
+wire m_rst_sync;
+
+logic [WIDTH-1:0] mem[2**FIFO_AW];
+logic mem_read_data_valid_reg;
+
+logic [WIDTH-1:0] mem_rd_data_pipe_reg[RAM_PIPELINE+1-1:0];
+logic [RAM_PIPELINE+1-1:0] mem_rd_valid_pipe_reg;
+`else
 logic [FIFO_AW:0] wr_ptr_reg = '0;
 logic [FIFO_AW:0] wr_ptr_commit_reg = '0;
 logic [FIFO_AW:0] wr_ptr_gray_reg = '0;
@@ -212,6 +271,7 @@ logic mem_read_data_valid_reg = 1'b0;
 (* shreg_extract = "no" *)
 logic [WIDTH-1:0] mem_rd_data_pipe_reg[RAM_PIPELINE+1-1:0];
 logic [RAM_PIPELINE+1-1:0] mem_rd_valid_pipe_reg = 0;
+`endif
 
 // full when first TWO MSBs do NOT match, but rest matches
 // (gray code equivalent of first MSB different but rest same)
@@ -226,6 +286,38 @@ logic write;
 logic read;
 logic store_output;
 
+`ifdef ASIC
+logic s_frame_reg;
+logic m_frame_reg;
+
+logic drop_frame_reg;
+logic mark_frame_reg;
+logic send_frame_reg;
+logic overflow_reg;
+logic bad_frame_reg;
+logic good_frame_reg;
+
+logic m_empty_pipe_reg;
+logic m_terminate_frame_reg;
+
+logic [FIFO_AW:0] s_depth_reg;
+logic [FIFO_AW:0] s_depth_commit_reg;
+logic [FIFO_AW:0] m_depth_reg;
+logic [FIFO_AW:0] m_depth_commit_reg;
+
+logic overflow_sync1_reg;
+logic overflow_sync2_reg;
+logic overflow_sync3_reg;
+logic overflow_sync4_reg;
+logic bad_frame_sync1_reg;
+logic bad_frame_sync2_reg;
+logic bad_frame_sync3_reg;
+logic bad_frame_sync4_reg;
+logic good_frame_sync1_reg;
+logic good_frame_sync2_reg;
+logic good_frame_sync3_reg;
+logic good_frame_sync4_reg;
+`else
 logic s_frame_reg = 1'b0;
 logic m_frame_reg = 1'b0;
 
@@ -256,6 +348,7 @@ logic good_frame_sync1_reg = 1'b0;
 logic good_frame_sync2_reg = 1'b0;
 logic good_frame_sync3_reg = 1'b0;
 logic good_frame_sync4_reg = 1'b0;
+`endif
 
 assign s_axis.tready = (FRAME_FIFO ? (!full || (full_wr && DROP_OVERSIZE_FRAME) || DROP_WHEN_FULL) : (!full || MARK_WHEN_FULL)) && !s_rst_sync;
 
@@ -363,7 +456,30 @@ m_reset_sync_inst (
 );
 
 // Write logic
+`ifdef ASYNC_RES
+always_ff @(posedge s_clk, negedge s_rst_n) begin
+    if (!s_rst_n) begin
+        wr_ptr_reg <= '0;
+        wr_ptr_commit_reg <= '0;
+        wr_ptr_gray_reg <= '0;
+        wr_ptr_sync_commit_reg <= '0;
+
+        wr_ptr_update_valid_reg <= 1'b0;
+        wr_ptr_update_reg <= 1'b0;
+
+        s_frame_reg <= 1'b0;
+
+        drop_frame_reg <= 1'b0;
+        mark_frame_reg <= 1'b0;
+        send_frame_reg <= 1'b0;
+        overflow_reg <= 1'b0;
+        bad_frame_reg <= 1'b0;
+        good_frame_reg <= 1'b0;
+    end
+    else begin
+`else
 always_ff @(posedge s_clk) begin
+`endif
     overflow_reg <= 1'b0;
     bad_frame_reg <= 1'b0;
     good_frame_reg <= 1'b0;
@@ -521,6 +637,9 @@ always_ff @(posedge s_clk) begin
         wr_ptr_update_reg <= 1'b0;
     end
 
+    `ifdef ASYNC_RES
+    end
+    `else
     if (s_rst) begin
         wr_ptr_reg <= '0;
         wr_ptr_commit_reg <= '0;
@@ -539,6 +658,7 @@ always_ff @(posedge s_clk) begin
         bad_frame_reg <= 1'b0;
         good_frame_reg <= 1'b0;
     end
+    `endif
 end
 
 // Write-side status
@@ -549,35 +669,33 @@ always_ff @(posedge s_clk) begin
 end
 
 // pointer synchronization
+`ifdef ASYNC_RES
+always_ff @(posedge s_clk, negedge s_rst_n) begin
+    if (!s_rst_n) begin
+`else
 always_ff @(posedge s_clk) begin
-    rd_ptr_gray_sync1_reg <= rd_ptr_gray_reg;
-    rd_ptr_gray_sync2_reg <= rd_ptr_gray_sync1_reg;
-    wr_ptr_update_ack_sync1_reg <= wr_ptr_update_sync3_reg;
-    wr_ptr_update_ack_sync2_reg <= wr_ptr_update_ack_sync1_reg;
-
     if (s_rst) begin
+`endif
         rd_ptr_gray_sync1_reg <= '0;
         rd_ptr_gray_sync2_reg <= '0;
         wr_ptr_update_ack_sync1_reg <= 1'b0;
         wr_ptr_update_ack_sync2_reg <= 1'b0;
     end
+    else begin
+        rd_ptr_gray_sync1_reg <= rd_ptr_gray_reg;
+        rd_ptr_gray_sync2_reg <= rd_ptr_gray_sync1_reg;
+        wr_ptr_update_ack_sync1_reg <= wr_ptr_update_sync3_reg;
+        wr_ptr_update_ack_sync2_reg <= wr_ptr_update_ack_sync1_reg;
+    end
 end
 
+`ifdef ASYNC_RES
+always_ff @(posedge m_clk, negedge m_rst_n) begin
+    if (!m_rst_n) begin
+`else
 always_ff @(posedge m_clk) begin
-    wr_ptr_gray_sync1_reg <= wr_ptr_gray_reg;
-    wr_ptr_gray_sync2_reg <= wr_ptr_gray_sync1_reg;
-    if (FRAME_FIFO && wr_ptr_update_sync2_reg ^ wr_ptr_update_sync3_reg) begin
-        wr_ptr_commit_sync_reg <= wr_ptr_sync_commit_reg;
-    end
-    wr_ptr_update_sync1_reg <= wr_ptr_update_reg;
-    wr_ptr_update_sync2_reg <= wr_ptr_update_sync1_reg;
-    wr_ptr_update_sync3_reg <= wr_ptr_update_sync2_reg;
-
-    if (FRAME_FIFO && m_rst_sync) begin
-        wr_ptr_gray_sync1_reg <= '0;
-    end
-
     if (m_rst) begin
+`endif
         wr_ptr_gray_sync1_reg <= '0;
         wr_ptr_gray_sync2_reg <= '0;
         wr_ptr_commit_sync_reg <= '0;
@@ -585,33 +703,48 @@ always_ff @(posedge m_clk) begin
         wr_ptr_update_sync2_reg <= 1'b0;
         wr_ptr_update_sync3_reg <= 1'b0;
     end
+    else begin
+        wr_ptr_gray_sync1_reg <= wr_ptr_gray_reg;
+        wr_ptr_gray_sync2_reg <= wr_ptr_gray_sync1_reg;
+        if (FRAME_FIFO && wr_ptr_update_sync2_reg ^ wr_ptr_update_sync3_reg) begin
+            wr_ptr_commit_sync_reg <= wr_ptr_sync_commit_reg;
+        end
+        wr_ptr_update_sync1_reg <= wr_ptr_update_reg;
+        wr_ptr_update_sync2_reg <= wr_ptr_update_sync1_reg;
+        wr_ptr_update_sync3_reg <= wr_ptr_update_sync2_reg;
+
+        if (FRAME_FIFO && m_rst_sync) begin
+            wr_ptr_gray_sync1_reg <= '0;
+        end
+    end
 end
 
 // status synchronization
+`ifdef ASYNC_RES
+always_ff @(posedge s_clk, negedge s_rst_n) begin
+    if (!s_rst_n) begin
+`else
 always_ff @(posedge s_clk) begin
-    overflow_sync1_reg <= overflow_sync1_reg ^ overflow_reg;
-    bad_frame_sync1_reg <= bad_frame_sync1_reg ^ bad_frame_reg;
-    good_frame_sync1_reg <= good_frame_sync1_reg ^ good_frame_reg;
-
     if (s_rst) begin
+`endif
         overflow_sync1_reg <= 1'b0;
         bad_frame_sync1_reg <= 1'b0;
         good_frame_sync1_reg <= 1'b0;
     end
+    else begin
+        overflow_sync1_reg <= overflow_sync1_reg ^ overflow_reg;
+        bad_frame_sync1_reg <= bad_frame_sync1_reg ^ bad_frame_reg;
+        good_frame_sync1_reg <= good_frame_sync1_reg ^ good_frame_reg;
+    end
 end
 
+`ifdef ASYNC_RES
+always_ff @(posedge m_clk, negedge m_rst_n) begin
+    if (!m_rst_n) begin
+`else
 always_ff @(posedge m_clk) begin
-    overflow_sync2_reg <= overflow_sync1_reg;
-    overflow_sync3_reg <= overflow_sync2_reg;
-    overflow_sync4_reg <= overflow_sync3_reg;
-    bad_frame_sync2_reg <= bad_frame_sync1_reg;
-    bad_frame_sync3_reg <= bad_frame_sync2_reg;
-    bad_frame_sync4_reg <= bad_frame_sync3_reg;
-    good_frame_sync2_reg <= good_frame_sync1_reg;
-    good_frame_sync3_reg <= good_frame_sync2_reg;
-    good_frame_sync4_reg <= good_frame_sync3_reg;
-
     if (m_rst) begin
+`endif
         overflow_sync2_reg <= 1'b0;
         overflow_sync3_reg <= 1'b0;
         overflow_sync4_reg <= 1'b0;
@@ -622,10 +755,34 @@ always_ff @(posedge m_clk) begin
         good_frame_sync3_reg <= 1'b0;
         good_frame_sync4_reg <= 1'b0;
     end
+    else begin
+        overflow_sync2_reg <= overflow_sync1_reg;
+        overflow_sync3_reg <= overflow_sync2_reg;
+        overflow_sync4_reg <= overflow_sync3_reg;
+        bad_frame_sync2_reg <= bad_frame_sync1_reg;
+        bad_frame_sync3_reg <= bad_frame_sync2_reg;
+        bad_frame_sync4_reg <= bad_frame_sync3_reg;
+        good_frame_sync2_reg <= good_frame_sync1_reg;
+        good_frame_sync3_reg <= good_frame_sync2_reg;
+        good_frame_sync4_reg <= good_frame_sync3_reg;
+    end
 end
 
 // Read logic
+`ifdef ASYNC_RES
+always_ff @(posedge m_clk, negedge m_rst_n) begin
+if(!m_rst_n) begin
+    rd_ptr_reg <= '0;
+    rd_ptr_gray_reg <= '0;
+    mem_rd_valid_pipe_reg <= '0;
+    m_frame_reg <= 1'b0;
+    m_empty_pipe_reg <= 1'b0;
+    m_terminate_frame_reg <= 1'b0;
+end
+else begin
+`else
 always_ff @(posedge m_clk) begin
+`endif
     if (m_axis_tready_pipe) begin
         // output ready; invalidate stage
         mem_rd_valid_pipe_reg[RAM_PIPELINE+1-1] <= 1'b0;
@@ -684,6 +841,9 @@ always_ff @(posedge m_clk) begin
         rd_ptr_gray_reg <= '0;
     end
 
+    `ifdef ASYNC_RES
+    end
+    `else
     if (m_rst) begin
         rd_ptr_reg <= '0;
         rd_ptr_gray_reg <= '0;
@@ -692,6 +852,7 @@ always_ff @(posedge m_clk) begin
         m_empty_pipe_reg <= 1'b0;
         m_terminate_frame_reg <= 1'b0;
     end
+    `endif
 end
 
 // Read-side status
@@ -719,6 +880,20 @@ if (!OUTPUT_FIFO_EN) begin
 end else begin : output_fifo
 
     // output datapath logic
+    `ifdef ASIC
+    logic [DATA_W-1:0] m_axis_tdata_reg;
+    logic [KEEP_W-1:0] m_axis_tkeep_reg;
+    logic [KEEP_W-1:0] m_axis_tstrb_reg;
+    logic              m_axis_tvalid_reg;
+    logic              m_axis_tlast_reg;
+    logic [ID_W-1:0]   m_axis_tid_reg;
+    logic [DEST_W-1:0] m_axis_tdest_reg;
+    logic [USER_W-1:0] m_axis_tuser_reg;
+
+    logic [OUTPUT_FIFO_AW+1-1:0] out_fifo_wr_ptr_reg;
+    logic [OUTPUT_FIFO_AW+1-1:0] out_fifo_rd_ptr_reg;
+    logic out_fifo_half_full_reg;
+    `else
     logic [DATA_W-1:0] m_axis_tdata_reg  = '0;
     logic [KEEP_W-1:0] m_axis_tkeep_reg  = '0;
     logic [KEEP_W-1:0] m_axis_tstrb_reg  = '0;
@@ -731,6 +906,7 @@ end else begin : output_fifo
     logic [OUTPUT_FIFO_AW+1-1:0] out_fifo_wr_ptr_reg = 0;
     logic [OUTPUT_FIFO_AW+1-1:0] out_fifo_rd_ptr_reg = 0;
     logic out_fifo_half_full_reg = 1'b0;
+    `endif
 
     wire out_fifo_full = out_fifo_wr_ptr_reg == (out_fifo_rd_ptr_reg ^ {1'b1, {OUTPUT_FIFO_AW{1'b0}}});
     wire out_fifo_empty = out_fifo_wr_ptr_reg == out_fifo_rd_ptr_reg;
@@ -763,7 +939,17 @@ end else begin : output_fifo
     assign m_axis_tdest_out  = DEST_EN ? m_axis_tdest_reg : '0;
     assign m_axis_tuser_out  = USER_EN ? m_axis_tuser_reg : '0;
 
+    `ifdef ASYNC_RES
+    always_ff @(posedge m_clk, negedge m_rst_n) begin
+    if(!m_rst_n) begin
+        out_fifo_wr_ptr_reg <= 0;
+        out_fifo_rd_ptr_reg <= 0;
+        m_axis_tvalid_reg <= 1'b0;
+    end
+    else begin
+    `else
     always_ff @(posedge m_clk) begin
+    `endif
         m_axis_tvalid_reg <= m_axis_tvalid_reg && !m_axis_tready_out;
 
         out_fifo_half_full_reg <= $unsigned(out_fifo_wr_ptr_reg - out_fifo_rd_ptr_reg) >= 2**(OUTPUT_FIFO_AW-1);
@@ -791,11 +977,15 @@ end else begin : output_fifo
             out_fifo_rd_ptr_reg <= out_fifo_rd_ptr_reg + 1;
         end
 
+        `ifdef ASYNC_RES
+        end
+        `else
         if (m_rst) begin
             out_fifo_wr_ptr_reg <= 0;
             out_fifo_rd_ptr_reg <= 0;
             m_axis_tvalid_reg <= 1'b0;
         end
+        `endif
     end
 
 end
@@ -841,7 +1031,16 @@ if (PAUSE_EN) begin : pause
 
     assign m_pause_ack = pause_reg;
 
+    `ifdef ASYNC_RES
+    always_ff @(posedge m_clk, negedge m_rst_n) begin
+    if (!m_rst_n) begin
+        pause_frame_reg <= 1'b0;
+        pause_reg <= 1'b0;
+    end
+    else begin
+    `else
     always_ff @(posedge m_clk) begin
+    `endif
         if (FRAME_PAUSE) begin
             if (pause_reg) begin
                 // paused; update pause status
@@ -861,11 +1060,14 @@ if (PAUSE_EN) begin : pause
         end else begin
             pause_reg <= m_pause_req || s_pause_req_sync;
         end
-
+        `ifdef ASYNC_RES
+        end
+        `else
         if (m_rst) begin
             pause_frame_reg <= 1'b0;
             pause_reg <= 1'b0;
         end
+        `endif
     end
 
 end else begin

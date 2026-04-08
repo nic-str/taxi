@@ -7,12 +7,17 @@
 
 ### Currently supported modules
 **Prim**
-taxi_arbiter.sv
+* taxi_arbiter.sv
+* taxi_penc.sv
+
+**SYNC**
+* taxi_sync_signal.sv
+* taxi_sync_reset.sv
+
 **AXIS**
-taxi_axis_adapter.sv
-taxi_axis_arb_mux.sv
-
-
+* taxi_axis_adapter.sv
+* taxi_axis_arb_mux.sv
+* taxi_axis_async_fifo.sv
 
 
 [![Regression Tests](https://github.com/fpganinja/taxi/actions/workflows/regression-tests.yml/badge.svg)](https://github.com/fpganinja/taxi/actions/workflows/regression-tests.yml)

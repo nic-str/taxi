@@ -28,8 +28,12 @@ module taxi_sync_reset #
     output wire logic  out
 );
 
+`ifdef ASIC
+logic [N-1:0] sync_reg;
+`else
 (* async_reg="true", srl_style="register", shreg_extract="no" *)
 logic [N-1:0] sync_reg = '1;
+`endif
 
 assign out = sync_reg[N-1];
 
