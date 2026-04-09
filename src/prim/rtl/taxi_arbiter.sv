@@ -39,11 +39,20 @@ module taxi_arbiter #
     output wire logic [$clog2(PORTS)-1:0]  grant_index
 );
 
+logic rst_n;
+assign rst_n = ~rst;
+
 localparam CL_PORTS = $clog2(PORTS);
 
+`ifdef ASIC
+logic [PORTS-1:0] grant_reg, grant_next;
+logic grant_valid_reg, grant_valid_next;
+logic [CL_PORTS-1:0] grant_index_reg, grant_index_next;
+`else
 logic [PORTS-1:0] grant_reg = 'd0, grant_next;
 logic grant_valid_reg = 1'b0, grant_valid_next;
 logic [CL_PORTS-1:0] grant_index_reg = 'd0, grant_index_next;
+`endif
 
 assign grant_valid = grant_valid_reg;
 assign grant = grant_reg;
@@ -64,8 +73,11 @@ penc_inst (
     .output_mask(req_mask)
 );
 
+`ifdef ASIC
+logic [PORTS-1:0] mask_reg, mask_next;
+`else
 logic [PORTS-1:0] mask_reg = 'd0, mask_next;
-
+`endif
 wire masked_req_valid;
 wire [CL_PORTS-1:0] masked_req_index;
 wire [PORTS-1:0] masked_req_mask;
@@ -136,17 +148,24 @@ always_comb begin
     end
 end
 
+`ifdef ASYNC_RES
+always @(posedge clk, negedge rst_n) begin
+    if (!rst_n) begin
+`else
 always @(posedge clk) begin // Fix for multi driver error
-    grant_reg <= grant_next;
-    grant_valid_reg <= grant_valid_next;
-    grant_index_reg <= grant_index_next;
-    mask_reg <= mask_next;
-
     if (rst) begin
+`endif
+
         grant_reg <= 'd0;
         grant_valid_reg <= 1'b0;
         grant_index_reg <= 'd0;
         mask_reg <= 'd0;
+    end
+    else begin
+        grant_reg <= grant_next;
+        grant_valid_reg <= grant_valid_next;
+        grant_index_reg <= grant_index_next;
+        mask_reg <= mask_next;
     end
 end
 

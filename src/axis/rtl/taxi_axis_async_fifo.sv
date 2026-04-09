@@ -55,9 +55,8 @@ module taxi_axis_async_fifo #
     // Enable pause request input
     parameter logic PAUSE_EN = 1'b0,
     // Pause between frames
-    parameter logic FRAME_PAUSE = FRAME_FIFO,
+    parameter logic FRAME_PAUSE = FRAME_FIFO `ifdef CADENCE ,
 
-    `ifdef CADENCE
     parameter logic KEEP_EN = 1'b0,
     parameter logic STRB_EN = 1'b0,
     parameter logic LAST_EN = 1'b0,
@@ -993,8 +992,13 @@ end
 if (PAUSE_EN) begin : pause
 
     // Pause logic
+    `ifdef ASIC
+    logic pause_reg;
+    logic pause_frame_reg;
+    `else
     logic pause_reg = 1'b0;
     logic pause_frame_reg = 1'b0;
+    `endif
 
     wire s_pause_req_sync;
 
