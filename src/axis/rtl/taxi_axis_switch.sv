@@ -23,10 +23,10 @@ module taxi_axis_switch #
     parameter M_COUNT = 4,
     // Output interface routing base tdest selection
     // Port selected if M_BASE <= tdest <= M_TOP
-    parameter M_BASE[M_COUNT] = '{M_COUNT{'0}},
+    // parameter logic [S_DEST_W-1:0] M_BASE[M_COUNT] = '{M_COUNT{'0}},
     // Output interface routing top tdest selection
     // Port selected if M_BASE <= tdest <= M_TOP
-    parameter M_TOP[M_COUNT] = '{M_COUNT{'0}},
+    // parameter logic [S_DEST_W-1:0] M_TOP[M_COUNT] = '{M_COUNT{'0}},
     // Set for default routing with tdest MSBs as port index
     parameter logic AUTO_ADDR = 1'b0,
     // Interface connection control
@@ -42,7 +42,19 @@ module taxi_axis_switch #
     // select round robin arbitration
     parameter logic ARB_ROUND_ROBIN = 1'b1,
     // LSB priority selection
-    parameter logic ARB_LSB_HIGH_PRIO = 1'b1
+    parameter logic ARB_LSB_HIGH_PRIO = 1'b1,
+
+
+    parameter logic KEEP_EN = 1'b0,
+
+    parameter logic STRB_EN = 1'b0,
+    parameter logic LAST_EN = 1'b0,
+    parameter logic ID_EN = 1'b0,
+
+    parameter logic DEST_EN = 1'b0,
+
+    parameter logic USER_EN = 1'b0
+
 )
 (
     input  wire logic  clk,
@@ -60,20 +72,22 @@ module taxi_axis_switch #
 );
 
 // extract parameters
-localparam DATA_W = s_axis[0].DATA_W;
-localparam logic KEEP_EN = s_axis[0].KEEP_EN && m_axis[0].KEEP_EN;
-localparam KEEP_W = s_axis[0].KEEP_W;
-localparam logic STRB_EN = s_axis[0].STRB_EN && m_axis[0].STRB_EN;
-localparam logic LAST_EN = s_axis[0].LAST_EN && m_axis[0].LAST_EN;
-localparam logic ID_EN = s_axis[0].ID_EN && m_axis[0].ID_EN;
-localparam S_ID_W = s_axis[0].ID_W;
-localparam logic DEST_EN = s_axis[0].DEST_EN && m_axis[0].DEST_EN;
-localparam S_DEST_W = s_axis[0].DEST_W;
-localparam logic USER_EN = s_axis[0].USER_EN && m_axis[0].USER_EN;
-localparam USER_W = s_axis[0].USER_W;
+localparam DATA_W = $bits(s_axis[0].tdata);
 
-localparam M_ID_W = m_axis[0].ID_W;
-localparam M_DEST_W = m_axis[0].DEST_W;
+localparam KEEP_W = $bits(s_axis[0].tkeep);
+
+localparam S_ID_W = $bits(s_axis[0].tid);
+
+localparam S_DEST_W = $bits(s_axis[0].tdest);
+
+localparam USER_W = $bits(s_axis[0].tuser);
+
+localparam M_ID_W = $bits(m_axis[0].tid);
+localparam M_DEST_W = $bits(m_axis[0].tdest);
+
+
+localparam logic [S_DEST_W-1:0] M_BASE[M_COUNT] = '{M_COUNT{'0}};
+localparam logic [S_DEST_W-1:0] M_TOP[M_COUNT] = '{M_COUNT{'0}};
 
 localparam CL_S_COUNT = $clog2(S_COUNT);
 localparam CL_M_COUNT = $clog2(M_COUNT);
@@ -84,10 +98,10 @@ localparam S_DEST_W_INT = S_DEST_W > 0 ? S_DEST_W : 1;
 localparam M_DEST_W_INT = M_DEST_W > 0 ? M_DEST_W : 1;
 
 // check configuration
-if (m_axis.DATA_W != DATA_W)
+if ($bits(m_axis[0].tdata) != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
-if (KEEP_EN && m_axis.KEEP_W != KEEP_W)
+if (KEEP_EN && $bits(m_axis[0].tkeep) != KEEP_W)
     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
 
 if (M_COUNT > 1) begin
@@ -150,22 +164,27 @@ logic [S_COUNT-1:0]  int_axis_tready[M_COUNT];
 for (genvar m = 0; m < S_COUNT; m = m + 1) begin : s_if
 
     taxi_axis_if #(
-        .DATA_W(s_axis.DATA_W),
-        .KEEP_EN(s_axis.KEEP_EN),
-        .KEEP_W(s_axis.KEEP_W),
-        .STRB_EN(s_axis.STRB_EN),
-        .LAST_EN(s_axis.LAST_EN),
-        .ID_EN(s_axis.ID_EN),
-        .ID_W(s_axis.ID_W),
-        .DEST_EN(s_axis.DEST_EN),
-        .DEST_W(s_axis.DEST_W),
-        .USER_EN(s_axis.USER_EN),
-        .USER_W(s_axis.USER_W)
+        .DATA_W(DATA_W),
+        .KEEP_EN(KEEP_EN),
+        .KEEP_W(KEEP_W),
+        .STRB_EN(STRB_EN),
+        .LAST_EN(LAST_EN),
+        .ID_EN(ID_EN),
+        .ID_W(S_ID_W),
+        .DEST_EN(DEST_EN),
+        .DEST_W(S_DEST_W),
+        .USER_EN(USER_EN),
+        .USER_W(USER_W)
     ) int_axis();
 
     // S side register
     taxi_axis_register #(
-        .REG_TYPE(S_REG_TYPE)
+        .REG_TYPE(S_REG_TYPE),
+        .KEEP_EN(KEEP_EN),
+        .STRB_EN(STRB_EN),
+        .ID_EN(ID_EN),
+        .DEST_EN(DEST_EN),
+        .USER_EN(USER_EN)
     )
     reg_inst (
         .clk(clk),
@@ -200,10 +219,17 @@ for (genvar m = 0; m < S_COUNT; m = m + 1) begin : s_if
     end else begin
 
         // decoding
+        `ifdef ASIC
+        logic frame_reg , frame_next;
+        logic [CL_M_COUNT-1:0] select_reg, select_next;
+        logic drop_reg, drop_next;
+        logic select_valid_reg, select_valid_next;
+        `else
         logic frame_reg = 1'b0, frame_next;
         logic [CL_M_COUNT-1:0] select_reg = '0, select_next;
         logic drop_reg = 1'b0, drop_next;
         logic select_valid_reg = 1'b0, select_valid_next;
+        `endif
 
         always_comb begin
             select_next = select_reg;
@@ -240,6 +266,10 @@ for (genvar m = 0; m < S_COUNT; m = m + 1) begin : s_if
 
             if (rst) begin
                 select_valid_reg <= 1'b0;
+                `ifdef ASIC
+                    select_reg <= '0;
+                    drop_reg <= '0;
+                `endif
             end
         end
 
@@ -266,17 +296,17 @@ end // s_if
 for (genvar n = 0; n < M_COUNT; n = n + 1) begin : m_if
 
     taxi_axis_if #(
-        .DATA_W(m_axis.DATA_W),
-        .KEEP_EN(m_axis.KEEP_EN),
-        .KEEP_W(m_axis.KEEP_W),
-        .STRB_EN(m_axis.STRB_EN),
-        .LAST_EN(m_axis.LAST_EN),
-        .ID_EN(m_axis.ID_EN),
-        .ID_W(m_axis.ID_W),
-        .DEST_EN(m_axis.DEST_EN),
-        .DEST_W(m_axis.DEST_W),
-        .USER_EN(m_axis.USER_EN),
-        .USER_W(m_axis.USER_W)
+        .DATA_W($bits(m_axis[0].tdata)),
+        .KEEP_EN(KEEP_EN),
+        .KEEP_W($bits(m_axis[0].tkeep)),
+        .STRB_EN(STRB_EN),
+        .LAST_EN(LAST_EN),
+        .ID_EN(ID_EN),
+        .ID_W($bits(m_axis[0].tid)),
+        .DEST_EN(DEST_EN),
+        .DEST_W($bits(m_axis[0].tdest)),
+        .USER_EN(USER_EN),
+        .USER_W($bits(m_axis[0].tuser))
     ) int_axis();
 
     if (S_COUNT == 1) begin
@@ -347,7 +377,12 @@ for (genvar n = 0; n < M_COUNT; n = n + 1) begin : m_if
 
     // M side register
     taxi_axis_register #(
-        .REG_TYPE(S_REG_TYPE)
+        .REG_TYPE(S_REG_TYPE),
+        .KEEP_EN(KEEP_EN),
+        .STRB_EN(STRB_EN),
+        .ID_EN(ID_EN),
+        .DEST_EN(DEST_EN),
+        .USER_EN(USER_EN)
     )
     reg_inst (
         .clk(clk),

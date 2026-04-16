@@ -84,6 +84,19 @@ module taxi_axis_fifo #
 );
 
 // extract parameters
+`ifdef CADENCE
+localparam DATA_W = $bits(s_axis.tdata);
+localparam logic KEEP_EN = ($bits(s_axis.get_keep_en) - 1) && ($bits(m_axis.get_keep_en) - 1);
+localparam KEEP_W = $bits(s_axis.tkeep);
+localparam logic STRB_EN = ($bits(s_axis.get_strb_en) - 1) && ($bits(m_axis.get_strb_en) - 1);
+localparam logic LAST_EN = ($bits(s_axis.get_last_en) - 1) && ($bits(m_axis.get_last_en) - 1);
+localparam logic ID_EN = ($bits(s_axis.get_id_en) - 1) && ($bits(m_axis.get_id_en) - 1);
+localparam ID_W = $bits(s_axis.tid);
+localparam logic DEST_EN = ($bits(s_axis.get_dest_en) - 1) && ($bits(m_axis.get_dest_en) - 1);
+localparam DEST_W = $bits(s_axis.tdest);
+localparam logic USER_EN = ($bits(s_axis.get_user_en) - 1) && ($bits(m_axis.get_user_en) - 1);
+localparam USER_W = $bits(s_axis.tuser);
+`else
 localparam DATA_W = s_axis.DATA_W;
 localparam logic KEEP_EN = s_axis.KEEP_EN && m_axis.KEEP_EN;
 localparam KEEP_W = s_axis.KEEP_W;
@@ -95,6 +108,7 @@ localparam logic DEST_EN = s_axis.DEST_EN && m_axis.DEST_EN;
 localparam DEST_W = s_axis.DEST_W;
 localparam logic USER_EN = s_axis.USER_EN && m_axis.USER_EN;
 localparam USER_W = s_axis.USER_W;
+`endif
 
 localparam CL_DEPTH = $clog2(DEPTH);
 localparam CL_KEEP_W = $clog2(KEEP_W);
@@ -124,16 +138,16 @@ if (MARK_WHEN_FULL && FRAME_FIFO)
 if (MARK_WHEN_FULL && !LAST_EN)
     $fatal(0, "Error: MARK_WHEN_FULL set requires LAST_EN set (instance %m)");
 
-if (m_axis.DATA_W != DATA_W)
+if ($bits(m_axis.tdata) != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
-if (KEEP_EN && m_axis.KEEP_W != KEEP_W)
+if (KEEP_EN && $bits(m_axis.tkeep) != KEEP_W)
     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
 
-if (DROP_BAD_FRAME && !s_axis.USER_EN)
+if (DROP_BAD_FRAME && !USER_EN)
     $fatal(0, "Error: DROP_BAD_FRAME set requires s_axis.USER_EN (instance %m)");
 
-if (MARK_WHEN_FULL && !m_axis.USER_EN)
+if (MARK_WHEN_FULL && !USER_EN)
     $fatal(0, "Error: MARK_WHEN_FULL set requires m_axis.USER_EN (instance %m)");
 
 localparam KEEP_OFFSET = DATA_W;
@@ -144,17 +158,26 @@ localparam DEST_OFFSET = ID_OFFSET   + (ID_EN   ? ID_W   : 0);
 localparam USER_OFFSET = DEST_OFFSET + (DEST_EN ? DEST_W : 0);
 localparam WIDTH       = USER_OFFSET + (USER_EN ? USER_W : 0);
 
+`ifdef ASIC
+logic [FIFO_AW:0] wr_ptr_reg;
+logic [FIFO_AW:0] wr_ptr_commit_reg;
+logic [FIFO_AW:0] rd_ptr_reg;
+`else
 logic [FIFO_AW:0] wr_ptr_reg = '0;
 logic [FIFO_AW:0] wr_ptr_commit_reg = '0;
 logic [FIFO_AW:0] rd_ptr_reg = '0;
+`endif
 
 (* ramstyle = "no_rw_check" *)
 logic [WIDTH-1:0] mem[2**FIFO_AW];
 
 (* shreg_extract = "no" *)
 logic [WIDTH-1:0] mem_rd_data_pipe_reg[RAM_PIPELINE+1-1:0];
+`ifdef ASIC
+logic [RAM_PIPELINE+1-1:0] mem_rd_valid_pipe_reg;
+`else
 logic [RAM_PIPELINE+1-1:0] mem_rd_valid_pipe_reg = '0;
-
+`endif
 // full when first MSB differs but the rest match
 wire full = wr_ptr_reg == (rd_ptr_reg ^ {1'b1, {FIFO_AW{1'b0}}});
 // empty when pointers match exactly
@@ -162,8 +185,18 @@ wire empty = wr_ptr_commit_reg == rd_ptr_reg;
 // overflow within packet, same as full but based on write commit
 wire full_wr = wr_ptr_reg == (wr_ptr_commit_reg ^ {1'b1, {FIFO_AW{1'b0}}});
 
+`ifdef ASIC
+logic s_frame_reg;
+logic drop_frame_reg;
+logic mark_frame_reg;
+logic send_frame_reg;
+logic [FIFO_AW:0] depth_reg;
+logic [FIFO_AW:0] depth_commit_reg;
+logic overflow_reg;
+logic bad_frame_reg;
+logic good_frame_reg;
+`else
 logic s_frame_reg = 1'b0;
-
 logic drop_frame_reg = 1'b0;
 logic mark_frame_reg = 1'b0;
 logic send_frame_reg = 1'b0;
@@ -172,6 +205,7 @@ logic [FIFO_AW:0] depth_commit_reg = '0;
 logic overflow_reg = 1'b0;
 logic bad_frame_reg = 1'b0;
 logic good_frame_reg = 1'b0;
+`endif
 
 assign s_axis.tready = FRAME_FIFO ? (!full || (full_wr && DROP_OVERSIZE_FRAME) || DROP_WHEN_FULL) : (!full || MARK_WHEN_FULL);
 
@@ -501,8 +535,13 @@ end
 if (PAUSE_EN) begin : pause
 
     // Pause logic
+    `ifdef ASIC
+    logic pause_reg;
+    logic pause_frame_reg;
+    `else
     logic pause_reg = 1'b0;
     logic pause_frame_reg = 1'b0;
+    `endif
 
     assign m_axis_tready_out = m_axis.tready && !pause_reg;
     assign m_axis.tvalid = m_axis_tvalid_out && !pause_reg;

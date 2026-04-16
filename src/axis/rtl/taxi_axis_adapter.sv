@@ -15,21 +15,7 @@ Authors:
 /*
  * AXI4-Stream bus width adapter
  */
-module taxi_axis_adapter 
-
-`ifdef CADENCE
-// Cannot extract these parameters from interface for now
-#(
-    // Use tstrb signal
-    parameter logic STRB_EN = 1'b0,
-    // Use tlast signal
-    parameter logic LAST_EN = 1'b1,
-    // Use tid signal
-    parameter logic ID_EN = 0,
-    parameter logic DEST_EN = 0,
-    parameter logic USER_EN = 0
-)
-`endif
+module taxi_axis_adapter
 (
     input  wire logic  clk,
     input  wire logic  rst,
@@ -51,15 +37,20 @@ assign rst_n = ~rst;
 // extract parameters from interface
 `ifdef CADENCE
 localparam S_DATA_W = $bits(s_axis.tdata);
+localparam logic S_KEEP_EN = ($bits(s_axis.get_keep_en) - 1);
 localparam S_KEEP_W = $bits(s_axis.tkeep);
-localparam logic S_KEEP_EN = S_KEEP_W > 1;
+localparam logic STRB_EN = ($bits(s_axis.get_strb_en) - 1) && ($bits(m_axis.get_strb_en) - 1);
+localparam logic LAST_EN = ($bits(s_axis.get_last_en) - 1);
+localparam logic ID_EN = ($bits(s_axis.get_id_en) - 1) && ($bits(m_axis.get_id_en) - 1);
 localparam ID_W = $bits(s_axis.tid);
+localparam logic DEST_EN = ($bits(s_axis.get_dest_en) - 1) && ($bits(m_axis.get_dest_en) - 1);
 localparam DEST_W = $bits(s_axis.tdest);
+localparam logic USER_EN = ($bits(s_axis.get_user_en) - 1) && ($bits(m_axis.get_user_en) - 1);
 localparam USER_W = $bits(s_axis.tuser);
 
 localparam M_DATA_W = $bits(m_axis.tdata);
+localparam logic M_KEEP_EN = ($bits(m_axis.get_keep_en) - 1);
 localparam M_KEEP_W = $bits(m_axis.tkeep);
-localparam logic M_KEEP_EN = M_KEEP_W>1;
 `else
 localparam S_DATA_W = s_axis.DATA_W;
 localparam logic S_KEEP_EN = s_axis.KEEP_EN;
@@ -182,6 +173,8 @@ end else if (M_BYTE_LANES > S_BYTE_LANES) begin : upsize
             seg_reg <= '0;
             s_axis_tvalid_reg <= 1'b0;
             m_axis_tvalid_reg <= 1'b0;
+            s_axis_tlast_reg <= 1'b0;
+            m_axis_tlast_reg <= 1'b0;
         end else begin
     `else
     always_ff @(posedge clk) begin
@@ -309,6 +302,8 @@ end else begin : downsize
         if(!rst_n) begin
             s_axis_tvalid_reg <= 1'b0;
             m_axis_tvalid_reg <= 1'b0;
+            s_axis_tlast_reg <= 1'b0;
+            m_axis_tlast_reg <= 1'b0;
         end else begin
     `else
     always_ff @(posedge clk) begin

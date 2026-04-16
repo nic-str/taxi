@@ -55,15 +55,7 @@ module taxi_axis_async_fifo #
     // Enable pause request input
     parameter logic PAUSE_EN = 1'b0,
     // Pause between frames
-    parameter logic FRAME_PAUSE = FRAME_FIFO `ifdef CADENCE ,
-
-    parameter logic KEEP_EN = 1'b0,
-    parameter logic STRB_EN = 1'b0,
-    parameter logic LAST_EN = 1'b0,
-    parameter logic ID_EN = 1'b0,
-    parameter logic DEST_EN = 1'b0,
-    parameter logic USER_EN = 1'b0
-    `endif
+    parameter logic FRAME_PAUSE = FRAME_FIFO
 )
 (
     /*
@@ -110,11 +102,17 @@ assign s_rst_n = ~s_rst;
 // extract parameters
 `ifdef CADENCE
 localparam DATA_W = $bits(s_axis.tdata);
+localparam logic KEEP_EN = ($bits(s_axis.get_keep_en) - 1) && ($bits(m_axis.get_keep_en) - 1);
 localparam KEEP_W = $bits(s_axis.tkeep);
+localparam logic STRB_EN = ($bits(s_axis.get_strb_en) - 1) && ($bits(m_axis.get_strb_en) - 1);
+localparam logic LAST_EN = ($bits(s_axis.get_last_en) - 1) && ($bits(m_axis.get_last_en) - 1);
+localparam logic ID_EN = ($bits(s_axis.get_id_en) - 1) && ($bits(m_axis.get_id_en) - 1);
 localparam ID_W = $bits(s_axis.tid);
+localparam logic DEST_EN = ($bits(s_axis.get_dest_en) - 1) && ($bits(m_axis.get_dest_en) - 1);
 localparam DEST_W = $bits(s_axis.tdest);
+localparam S_USER_EN = ($bits(s_axis.get_user_en) - 1);
+localparam logic USER_EN = S_USER_EN && ($bits(m_axis.get_user_en) - 1);
 localparam USER_W = $bits(s_axis.tuser);
-localparam S_USER_EN = USER_EN;
 `else
 localparam DATA_W = s_axis.DATA_W;
 localparam logic KEEP_EN = s_axis.KEEP_EN && m_axis.KEEP_EN;
@@ -167,8 +165,8 @@ if (KEEP_EN && $bits(m_axis.tkeep) != KEEP_W)
 if (DROP_BAD_FRAME && !S_USER_EN)
     $fatal(0, "Error: DROP_BAD_FRAME set requires s_axis.USER_EN (instance %m)");
 
-// if (MARK_WHEN_FULL && !m_axis.USER_EN)
-//     $fatal(0, "Error: MARK_WHEN_FULL set requires m_axis.USER_EN (instance %m)");
+if (MARK_WHEN_FULL && ($bits(m_axis.get_user_en) == 1))
+    $fatal(0, "Error: MARK_WHEN_FULL set requires m_axis.USER_EN (instance %m)");
 
 localparam KEEP_OFFSET = DATA_W;
 localparam STRB_OFFSET = KEEP_OFFSET + (KEEP_EN ? KEEP_W : 0);
@@ -219,7 +217,7 @@ wire s_rst_sync;
 wire m_rst_sync;
 
 logic [WIDTH-1:0] mem[2**FIFO_AW];
-logic mem_read_data_valid_reg;
+// logic mem_read_data_valid_reg;
 
 logic [WIDTH-1:0] mem_rd_data_pipe_reg[RAM_PIPELINE+1-1:0];
 logic [RAM_PIPELINE+1-1:0] mem_rd_valid_pipe_reg;
@@ -265,7 +263,7 @@ wire m_rst_sync;
 
 (* ramstyle = "no_rw_check" *)
 logic [WIDTH-1:0] mem[2**FIFO_AW];
-logic mem_read_data_valid_reg = 1'b0;
+// logic mem_read_data_valid_reg = 1'b0;
 
 (* shreg_extract = "no" *)
 logic [WIDTH-1:0] mem_rd_data_pipe_reg[RAM_PIPELINE+1-1:0];
@@ -281,9 +279,9 @@ wire empty = FRAME_FIFO ? (rd_ptr_reg == wr_ptr_commit_sync_reg) : (rd_ptr_gray_
 wire full_wr = wr_ptr_reg == (wr_ptr_commit_reg ^ {1'b1, {FIFO_AW{1'b0}}});
 
 // control signals
-logic write;
-logic read;
-logic store_output;
+// logic write;
+// logic read;
+// logic store_output;
 
 `ifdef ASIC
 logic s_frame_reg;
@@ -469,7 +467,7 @@ always_ff @(posedge s_clk, negedge s_rst_n) begin
         s_frame_reg <= 1'b0;
 
         drop_frame_reg <= 1'b0;
-        mark_frame_reg <= 1'b0;
+        drop_frame_reg <= 1'b0;
         send_frame_reg <= 1'b0;
         overflow_reg <= 1'b0;
         bad_frame_reg <= 1'b0;
@@ -482,6 +480,8 @@ always_ff @(posedge s_clk) begin
     overflow_reg <= 1'b0;
     bad_frame_reg <= 1'b0;
     good_frame_reg <= 1'b0;
+    mark_frame_reg <= 1'b0;
+    s_frame_reg <= 1'b0;
 
     if (FRAME_FIFO && wr_ptr_update_valid_reg) begin
         // have updated pointer to sync

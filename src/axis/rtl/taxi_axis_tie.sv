@@ -29,6 +29,19 @@ module taxi_axis_tie
 );
 
 // extract parameters
+`ifdef CADENCE
+localparam DATA_W = $bits(s_axis.tdata);
+localparam logic KEEP_EN = ($bits(s_axis.get_keep_en) - 1) && ($bits(m_axis.get_keep_en) - 1);
+localparam KEEP_W = $bits(s_axis.tkeep);
+localparam logic STRB_EN = ($bits(s_axis.get_strb_en) - 1) && ($bits(m_axis.get_strb_en) - 1);
+localparam logic LAST_EN = ($bits(s_axis.get_last_en) - 1) && ($bits(m_axis.get_last_en) - 1);
+localparam logic ID_EN = ($bits(s_axis.get_id_en) - 1) && ($bits(m_axis.get_id_en) - 1);
+localparam ID_W = $bits(s_axis.tid);
+localparam logic DEST_EN = ($bits(s_axis.get_dest_en) - 1) && ($bits(m_axis.get_dest_en) - 1);
+localparam DEST_W = $bits(s_axis.tdest);
+localparam logic USER_EN = ($bits(s_axis.get_user_en) - 1) && ($bits(m_axis.get_user_en) - 1);
+localparam USER_W = $bits(s_axis.tuser);
+`else
 localparam DATA_W = s_axis.DATA_W;
 localparam logic KEEP_EN = s_axis.KEEP_EN && m_axis.KEEP_EN;
 localparam KEEP_W = s_axis.KEEP_W;
@@ -40,12 +53,13 @@ localparam logic DEST_EN = s_axis.DEST_EN && m_axis.DEST_EN;
 localparam DEST_W = s_axis.DEST_W;
 localparam logic USER_EN = s_axis.USER_EN && m_axis.USER_EN;
 localparam USER_W = s_axis.USER_W;
+`endif
 
 // check configuration
-if (m_axis.DATA_W != DATA_W)
+if ($bits(m_axis.tdata) != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
-if (KEEP_EN && m_axis.KEEP_W != KEEP_W)
+if (KEEP_EN && $bits(m_axis.tkeep) != KEEP_W)
     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
 
 assign m_axis.tdata  = s_axis.tdata;
