@@ -42,19 +42,7 @@ module taxi_axis_switch #
     // select round robin arbitration
     parameter logic ARB_ROUND_ROBIN = 1'b1,
     // LSB priority selection
-    parameter logic ARB_LSB_HIGH_PRIO = 1'b1,
-
-
-    parameter logic KEEP_EN = 1'b0,
-
-    parameter logic STRB_EN = 1'b0,
-    parameter logic LAST_EN = 1'b0,
-    parameter logic ID_EN = 1'b0,
-
-    parameter logic DEST_EN = 1'b0,
-
-    parameter logic USER_EN = 1'b0
-
+    parameter logic ARB_LSB_HIGH_PRIO = 1'b1
 )
 (
     input  wire logic  clk,
@@ -71,19 +59,39 @@ module taxi_axis_switch #
     taxi_axis_if.src   m_axis[M_COUNT]
 );
 
+
+`ifdef CADENCE
 // extract parameters
 localparam DATA_W = $bits(s_axis[0].tdata);
-
+localparam logic KEEP_EN = ($bits(s_axis[0].get_keep_en) - 1) && ($bits(m_axis.get_keep_en) - 1);
 localparam KEEP_W = $bits(s_axis[0].tkeep);
-
+localparam logic STRB_EN = ($bits(s_axis[0].get_strb_en) - 1) && ($bits(m_axis.get_strb_en) - 1);
+localparam logic LAST_EN = ($bits(s_axis[0].get_last_en) - 1) && ($bits(m_axis.get_last_en) - 1);
+localparam logic ID_EN = ($bits(s_axis[0].get_id_en) - 1) && ($bits(m_axis.get_id_en) - 1);
 localparam S_ID_W = $bits(s_axis[0].tid);
-
-localparam S_DEST_W = $bits(s_axis[0].tdest);
-
+localparam logic DEST_EN = ($bits(s_axis[0].get_dest_en) - 1) && ($bits(m_axis.get_dest_en) - 1);
+localparam DEST_W = $bits(s_axis[0].tdest);
+localparam logic USER_EN = ($bits(s_axis[0].get_user_en) - 1) && ($bits(m_axis.get_user_en) - 1);
 localparam USER_W = $bits(s_axis[0].tuser);
 
-localparam M_ID_W = $bits(m_axis[0].tid);
-localparam M_DEST_W = $bits(m_axis[0].tdest);
+localparam M_ID_W = $bits(m_axis.tid);
+
+`else
+// extract parameters
+localparam DATA_W = s_axis[0].DATA_W;
+localparam logic KEEP_EN = s_axis[0].KEEP_EN && m_axis[0].KEEP_EN;
+localparam KEEP_W = s_axis[0].KEEP_W;
+localparam logic STRB_EN = s_axis[0].STRB_EN && m_axis[0].STRB_EN;
+localparam logic LAST_EN = s_axis[0].LAST_EN && m_axis[0].LAST_EN;
+localparam logic ID_EN = s_axis[0].ID_EN && m_axis[0].ID_EN;
+localparam S_ID_W = s_axis[0].ID_W;
+localparam logic DEST_EN = s_axis[0].DEST_EN && m_axis[0].DEST_EN;
+localparam S_DEST_W = s_axis[0].DEST_W;
+localparam logic USER_EN = s_axis[0].USER_EN && m_axis[0].USER_EN;
+localparam USER_W = s_axis[0].USER_W;
+
+localparam M_ID_W = m_axis[0].ID_W;
+`endif
 
 
 localparam logic [S_DEST_W-1:0] M_BASE[M_COUNT] = '{M_COUNT{'0}};
@@ -259,18 +267,29 @@ for (genvar m = 0; m < S_COUNT; m = m + 1) begin : s_if
             end
         end
 
+        `ifdef ASIC
+        always_ff @(posedge clk, nedgede rst_n) begin
+            if (!rst_n) begin
+                select_valid_reg <= 1'b0;
+                select_reg <= '0;
+                drop_reg <= '0;
+            end
+            else begin
+        `else
         always_ff @(posedge clk) begin
+        `endif
             select_reg <= select_next;
             drop_reg <= drop_next;
             select_valid_reg <= select_valid_next;
 
+            `ifdef ASIC
+            end
+            `else
             if (rst) begin
                 select_valid_reg <= 1'b0;
-                `ifdef ASIC
-                    select_reg <= '0;
-                    drop_reg <= '0;
-                `endif
             end
+            `endif
+
         end
 
         // forwarding
