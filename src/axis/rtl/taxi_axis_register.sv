@@ -225,6 +225,18 @@ end else if (REG_TYPE == 1) begin
     // simple register, inserts bubble cycles
 
     // datapath registers
+    `ifdef ASIC
+    logic              s_axis_tready_reg;
+
+    logic [DATA_W-1:0] m_axis_tdata_reg;
+    logic [KEEP_W-1:0] m_axis_tkeep_reg;
+    logic [KEEP_W-1:0] m_axis_tstrb_reg;
+    logic              m_axis_tvalid_reg, m_axis_tvalid_next;
+    logic              m_axis_tlast_reg;
+    logic [ID_W-1:0]   m_axis_tid_reg;
+    logic [DEST_W-1:0] m_axis_tdest_reg;
+    logic [USER_W-1:0] m_axis_tuser_reg;
+    `else
     logic              s_axis_tready_reg = 1'b0;
 
     logic [DATA_W-1:0] m_axis_tdata_reg  = '0;
@@ -235,6 +247,7 @@ end else if (REG_TYPE == 1) begin
     logic [ID_W-1:0]   m_axis_tid_reg    = '0;
     logic [DEST_W-1:0] m_axis_tdest_reg  = '0;
     logic [USER_W-1:0] m_axis_tuser_reg  = '0;
+    `endif
 
     // datapath control
     logic store_axis_input_to_output;
