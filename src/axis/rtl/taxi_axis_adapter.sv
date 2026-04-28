@@ -242,6 +242,14 @@ end else if (M_BYTE_LANES > S_BYTE_LANES) begin : upsize
 end else begin : downsize
     // output is narrower; downsize
 
+    property p_keep_valid_check;
+        @(posedge clk) disable iff (!rst_n)
+        (S_KEEP_EN && s_axis.tvalid) |-> !$isunknown(s_axis.tkeep);
+    endproperty
+
+    assert property (p_keep_valid_check)
+    else $error("[%m] s_axis.tkeep is 'x' or 'z' while s_axis.tvalid is high and S_KEEP_EN is active. Time: %0t",$time);
+
     // required number of segments in wider bus
     localparam SEG_COUNT = S_BYTE_LANES / M_BYTE_LANES;
     // data width and keep width per segment
