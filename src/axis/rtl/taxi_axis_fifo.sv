@@ -83,6 +83,9 @@ module taxi_axis_fifo #
     output wire logic                    status_good_frame
 );
 
+logic rst_n;
+assign rst_n = ~rst;
+
 // extract parameters
 `ifdef CADENCE
 localparam DATA_W = $bits(s_axis.tdata);
@@ -288,7 +291,25 @@ assign status_bad_frame = bad_frame_reg;
 assign status_good_frame = good_frame_reg;
 
 // Write logic
+`ifdef ASYNC_RES
+always_ff @(posedge clk, negedge rst_n) begin
+if (!rst_n) begin
+    wr_ptr_reg <= '0;
+    wr_ptr_commit_reg <= '0;
+
+    s_frame_reg <= 1'b0;
+
+    drop_frame_reg <= 1'b0;
+    mark_frame_reg <= 1'b0;
+    send_frame_reg <= 1'b0;
+    overflow_reg <= 1'b0;
+    bad_frame_reg <= 1'b0;
+    good_frame_reg <= 1'b0;
+end
+else begin
+`else
 always_ff @(posedge clk) begin
+`endif
     overflow_reg <= 1'b0;
     bad_frame_reg <= 1'b0;
     good_frame_reg <= 1'b0;
@@ -377,7 +398,9 @@ always_ff @(posedge clk) begin
             wr_ptr_commit_reg <= wr_ptr_reg + 1;
         end
     end
-
+    `ifdef ASYNC_RES
+    end
+    `else
     if (rst) begin
         wr_ptr_reg <= '0;
         wr_ptr_commit_reg <= '0;
@@ -391,6 +414,7 @@ always_ff @(posedge clk) begin
         bad_frame_reg <= 1'b0;
         good_frame_reg <= 1'b0;
     end
+    `endif
 end
 
 // Status
@@ -400,7 +424,16 @@ always_ff @(posedge clk) begin
 end
 
 // Read logic
-always_ff @(posedge clk) begin
+`ifdef ASYNC_RES
+always_ff @(posedge clk, negedge rst_n) begin
+    if (!rst_n) begin
+        rd_ptr_reg <= '0;
+        mem_rd_valid_pipe_reg <= '0;
+    end
+    else begin
+    `else
+    always_ff @(posedge clk) begin
+    `endif
     if (m_axis_tready_pipe) begin
         // output ready; invalidate stage
         mem_rd_valid_pipe_reg[RAM_PIPELINE+1-1] <= 1'b0;
@@ -427,10 +460,14 @@ always_ff @(posedge clk) begin
         end
     end
 
+    `ifdef ASYNC_RES
+    end
+    `else
     if (rst) begin
         rd_ptr_reg <= '0;
         mem_rd_valid_pipe_reg <= '0;
     end
+    `endif
 end
 
 if (!OUTPUT_FIFO_EN) begin
@@ -451,6 +488,20 @@ if (!OUTPUT_FIFO_EN) begin
 end else begin : output_fifo
 
     // output datapath logic
+    `ifdef ASIC
+    logic [DATA_W-1:0] m_axis_tdata_reg;
+    logic [KEEP_W-1:0] m_axis_tkeep_reg;
+    logic [KEEP_W-1:0] m_axis_tstrb_reg;
+    logic              m_axis_tvalid_reg;
+    logic              m_axis_tlast_reg;
+    logic [ID_W-1:0]   m_axis_tid_reg;
+    logic [DEST_W-1:0] m_axis_tdest_reg;
+    logic [USER_W-1:0] m_axis_tuser_reg;
+
+    logic [OUTPUT_FIFO_AW+1-1:0] out_fifo_wr_ptr_reg;
+    logic [OUTPUT_FIFO_AW+1-1:0] out_fifo_rd_ptr_reg;
+    logic out_fifo_half_full_reg;
+    `else
     logic [DATA_W-1:0] m_axis_tdata_reg  = '0;
     logic [KEEP_W-1:0] m_axis_tkeep_reg  = '0;
     logic [KEEP_W-1:0] m_axis_tstrb_reg  = '0;
@@ -463,6 +514,7 @@ end else begin : output_fifo
     logic [OUTPUT_FIFO_AW+1-1:0] out_fifo_wr_ptr_reg = '0;
     logic [OUTPUT_FIFO_AW+1-1:0] out_fifo_rd_ptr_reg = '0;
     logic out_fifo_half_full_reg = 1'b0;
+    `endif
 
     wire out_fifo_full = out_fifo_wr_ptr_reg == (out_fifo_rd_ptr_reg ^ {1'b1, {OUTPUT_FIFO_AW{1'b0}}});
     wire out_fifo_empty = out_fifo_wr_ptr_reg == out_fifo_rd_ptr_reg;
@@ -495,7 +547,18 @@ end else begin : output_fifo
     assign m_axis_tdest_out  = DEST_EN ? m_axis_tdest_reg : '0;
     assign m_axis_tuser_out  = USER_EN ? m_axis_tuser_reg : '0;
 
+    `ifdef ASYNC_RES
+    always_ff @(posedge clk, negedge rst_n) begin
+        if (!rst_n) begin
+            out_fifo_wr_ptr_reg <= '0;
+            out_fifo_rd_ptr_reg <= '0;
+            m_axis_tvalid_reg <= 1'b0;
+        end
+        else begin
+    `else
     always_ff @(posedge clk) begin
+    `endif
+        
         m_axis_tvalid_reg <= m_axis_tvalid_reg && !m_axis_tready_out;
 
         out_fifo_half_full_reg <= $unsigned(out_fifo_wr_ptr_reg - out_fifo_rd_ptr_reg) >= 2**(OUTPUT_FIFO_AW-1);
@@ -523,11 +586,15 @@ end else begin : output_fifo
             out_fifo_rd_ptr_reg <= out_fifo_rd_ptr_reg + 1;
         end
 
+        `ifdef ASYNC_RES
+        end
+        `else
         if (rst) begin
             out_fifo_wr_ptr_reg <= '0;
             out_fifo_rd_ptr_reg <= '0;
             m_axis_tvalid_reg <= 1'b0;
         end
+        `endif
     end
 
 end
