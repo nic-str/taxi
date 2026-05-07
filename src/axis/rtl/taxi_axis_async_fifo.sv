@@ -467,7 +467,7 @@ always_ff @(posedge s_clk, negedge s_rst_n) begin
         s_frame_reg <= 1'b0;
 
         drop_frame_reg <= 1'b0;
-        drop_frame_reg <= 1'b0;
+        mark_frame_reg <= 1'b0;
         send_frame_reg <= 1'b0;
         overflow_reg <= 1'b0;
         bad_frame_reg <= 1'b0;
