@@ -23,10 +23,10 @@ module taxi_axis_switch #
     parameter M_COUNT = 4,
     // Output interface routing base tdest selection
     // Port selected if M_BASE <= tdest <= M_TOP
-    // parameter logic [S_DEST_W-1:0] M_BASE[M_COUNT] = '{M_COUNT{'0}},
+    parameter logic M_BASE[M_COUNT] = '{M_COUNT{'0}},
     // Output interface routing top tdest selection
     // Port selected if M_BASE <= tdest <= M_TOP
-    // parameter logic [S_DEST_W-1:0] M_TOP[M_COUNT] = '{M_COUNT{'0}},
+    parameter logic M_TOP[M_COUNT] = '{M_COUNT{'0}},
     // Set for default routing with tdest MSBs as port index
     parameter logic AUTO_ADDR = 1'b0,
     // Interface connection control
@@ -63,18 +63,19 @@ module taxi_axis_switch #
 `ifdef CADENCE
 // extract parameters
 localparam DATA_W = $bits(s_axis[0].tdata);
-localparam logic KEEP_EN = ($bits(s_axis[0].get_keep_en) - 1) && ($bits(m_axis.get_keep_en) - 1);
+localparam logic KEEP_EN = ($bits(s_axis[0].get_keep_en) - 1) && ($bits(m_axis[0].get_keep_en) - 1);
 localparam KEEP_W = $bits(s_axis[0].tkeep);
-localparam logic STRB_EN = ($bits(s_axis[0].get_strb_en) - 1) && ($bits(m_axis.get_strb_en) - 1);
-localparam logic LAST_EN = ($bits(s_axis[0].get_last_en) - 1) && ($bits(m_axis.get_last_en) - 1);
-localparam logic ID_EN = ($bits(s_axis[0].get_id_en) - 1) && ($bits(m_axis.get_id_en) - 1);
+localparam logic STRB_EN = ($bits(s_axis[0].get_strb_en) - 1) && ($bits(m_axis[0].get_strb_en) - 1);
+localparam logic LAST_EN = ($bits(s_axis[0].get_last_en) - 1) && ($bits(m_axis[0].get_last_en) - 1);
+localparam logic ID_EN = ($bits(s_axis[0].get_id_en) - 1) && ($bits(m_axis[0].get_id_en) - 1);
 localparam S_ID_W = $bits(s_axis[0].tid);
-localparam logic DEST_EN = ($bits(s_axis[0].get_dest_en) - 1) && ($bits(m_axis.get_dest_en) - 1);
+localparam logic DEST_EN = ($bits(s_axis[0].get_dest_en) - 1) && ($bits(m_axis[0].get_dest_en) - 1);
 localparam DEST_W = $bits(s_axis[0].tdest);
-localparam logic USER_EN = ($bits(s_axis[0].get_user_en) - 1) && ($bits(m_axis.get_user_en) - 1);
+localparam logic USER_EN = ($bits(s_axis[0].get_user_en) - 1) && ($bits(m_axis[0].get_user_en) - 1);
 localparam USER_W = $bits(s_axis[0].tuser);
 
-localparam M_ID_W = $bits(m_axis.tid);
+localparam M_ID_W = $bits(m_axis[0].tid);
+localparam M_DEST_W = $bits(m_axis[0].tdest);
 
 `else
 // extract parameters
@@ -91,11 +92,8 @@ localparam logic USER_EN = s_axis[0].USER_EN && m_axis[0].USER_EN;
 localparam USER_W = s_axis[0].USER_W;
 
 localparam M_ID_W = m_axis[0].ID_W;
+localparam M_DEST_W = m_axis[0].DEST_W;
 `endif
-
-
-localparam logic [S_DEST_W-1:0] M_BASE[M_COUNT] = '{M_COUNT{'0}};
-localparam logic [S_DEST_W-1:0] M_TOP[M_COUNT] = '{M_COUNT{'0}};
 
 localparam CL_S_COUNT = $clog2(S_COUNT);
 localparam CL_M_COUNT = $clog2(M_COUNT);
