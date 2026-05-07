@@ -320,6 +320,7 @@ always_ff @(posedge clk) begin
     end
 
     if (FRAME_FIFO) begin
+        mark_frame_reg <= 1'b0; // to avoid warning
         // frame FIFO mode
         if (s_axis.tready && s_axis.tvalid) begin
             // transfer in
