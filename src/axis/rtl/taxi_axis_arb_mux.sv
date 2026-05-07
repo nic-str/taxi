@@ -70,7 +70,7 @@ localparam logic LAST_EN = s_axis[0].LAST_EN && m_axis[0].LAST_EN;
 localparam logic ID_EN = s_axis[0].ID_EN && m_axis[0].ID_EN;
 localparam S_ID_W = s_axis[0].ID_W;
 localparam logic DEST_EN = s_axis[0].DEST_EN && m_axis[0].DEST_EN;
-localparam S_DEST_W = s_axis[0].DEST_W;
+localparam DEST_W = s_axis[0].DEST_W;
 localparam logic USER_EN = s_axis[0].USER_EN && m_axis[0].USER_EN;
 localparam USER_W = s_axis[0].USER_W;
 
