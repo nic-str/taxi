@@ -47,6 +47,19 @@ module taxi_axis_demux #
 );
 
 // extract parameters
+`ifdef CADENCE
+localparam DATA_W = $bits(s_axis.tdata);
+localparam logic KEEP_EN = ($bits(s_axis.get_keep_en) - 1) && ($bits(m_axis[0].get_keep_en) - 1);
+localparam KEEP_W = $bits(s_axis.tkeep);
+localparam logic STRB_EN = ($bits(s_axis.get_strb_en) - 1) && ($bits(m_axis[0].get_strb_en) - 1);
+localparam logic LAST_EN = ($bits(s_axis.get_last_en) - 1) && ($bits(m_axis[0].get_last_en) - 1);
+localparam logic ID_EN = ($bits(s_axis.get_id_en) - 1) && ($bits(m_axis[0].get_id_en) - 1);
+localparam ID_W = $bits(s_axis.tid);
+localparam logic DEST_EN = ($bits(s_axis.get_dest_en) - 1) && ($bits(m_axis[0].get_dest_en) - 1);
+localparam DEST_W = $bits(s_axis.tdest);
+localparam logic USER_EN = ($bits(s_axis.get_user_en) - 1) && ($bits(m_axis[0].get_user_en) - 1);
+localparam USER_W = $bits(s_axis.tuser);
+`else
 localparam DATA_W = s_axis.DATA_W;
 localparam logic KEEP_EN = s_axis.KEEP_EN && m_axis[0].KEEP_EN;
 localparam KEEP_W = s_axis.KEEP_W;
@@ -55,12 +68,11 @@ localparam logic LAST_EN = s_axis.LAST_EN && m_axis[0].LAST_EN;
 localparam logic ID_EN = s_axis.ID_EN && m_axis[0].ID_EN;
 localparam ID_W = s_axis.ID_W;
 localparam logic DEST_EN = s_axis.DEST_EN && m_axis[0].DEST_EN;
-localparam S_ID_W = s_axis.ID_W;
-localparam M_ID_W = m_axis[0].ID_W;
 localparam S_DEST_W = s_axis.DEST_W;
 localparam M_DEST_W = m_axis[0].DEST_W;
 localparam logic USER_EN = s_axis.USER_EN && m_axis[0].USER_EN;
 localparam USER_W = s_axis.USER_W;
+`endif
 
 localparam CL_M_COUNT = $clog2(M_COUNT);
 
@@ -68,10 +80,10 @@ localparam M_DEST_W_INT = M_DEST_W > 0 ? M_DEST_W : 1;
 localparam M_ID_W_INT = M_ID_W > 0 ? M_ID_W : 1;
 
 // check configuration
-if (m_axis[0].DATA_W != DATA_W)
+if ($bits(m_axis[0].tdata) != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
-if (KEEP_EN && m_axis[0].KEEP_W != KEEP_W)
+if (KEEP_EN && $bits(m_axis[0].tkeep) != KEEP_W)
     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
 
 if (TID_ROUTE) begin
@@ -93,18 +105,30 @@ if (TDEST_ROUTE) begin
         $fatal(0, "Error: S_DEST_W too small for port count (instance %m)");
 end
 
+`ifdef ASIC
+logic [CL_M_COUNT-1:0] select_reg, select_ctl, select_next;
+logic drop_reg, drop_ctl, drop_next;
+logic frame_reg, frame_ctl, frame_next;
+
+logic s_axis_tready_reg, s_axis_tready_next;
+`else
 logic [CL_M_COUNT-1:0] select_reg = '0, select_ctl, select_next;
 logic drop_reg = 1'b0, drop_ctl, drop_next;
 logic frame_reg = 1'b0, frame_ctl, frame_next;
 
 logic s_axis_tready_reg = 1'b0, s_axis_tready_next;
+`endif
 
 // internal datapath
 logic [DATA_W-1:0]    m_axis_tdata_int;
 logic [KEEP_W-1:0]    m_axis_tkeep_int;
 logic [KEEP_W-1:0]    m_axis_tstrb_int;
 logic [M_COUNT-1:0]   m_axis_tvalid_int;
+`ifdef ASIC
+logic                 m_axis_tready_int_reg;
+`else
 logic                 m_axis_tready_int_reg = 1'b0;
+`endif
 logic                 m_axis_tlast_int;
 logic [M_ID_W-1:0]    m_axis_tid_int;
 logic [M_DEST_W-1:0]  m_axis_tdest_int;
@@ -188,7 +212,26 @@ always_ff @(posedge clk) begin
     end
 end
 
+`ifdef ASIC
 // output datapath logic
+logic [DATA_W-1:0]    m_axis_tdata_reg;
+logic [KEEP_W-1:0]    m_axis_tkeep_reg;
+logic [KEEP_W-1:0]    m_axis_tstrb_reg;
+logic [M_COUNT-1:0]   m_axis_tvalid_reg, m_axis_tvalid_next;
+logic                 m_axis_tlast_reg;
+logic [M_ID_W-1:0]    m_axis_tid_reg;
+logic [M_DEST_W-1:0]  m_axis_tdest_reg;
+logic [USER_W-1:0]    m_axis_tuser_reg;
+
+logic [DATA_W-1:0]    temp_m_axis_tdata_reg;
+logic [KEEP_W-1:0]    temp_m_axis_tkeep_reg;
+logic [KEEP_W-1:0]    temp_m_axis_tstrb_reg;
+logic [M_COUNT-1:0]   temp_m_axis_tvalid_reg, temp_m_axis_tvalid_next;
+logic                 temp_m_axis_tlast_reg;
+logic [M_ID_W-1:0]    temp_m_axis_tid_reg;
+logic [M_DEST_W-1:0]  temp_m_axis_tdest_reg;
+logic [USER_W-1:0]    temp_m_axis_tuser_reg;
+`else
 logic [DATA_W-1:0]    m_axis_tdata_reg  = '0;
 logic [KEEP_W-1:0]    m_axis_tkeep_reg  = '0;
 logic [KEEP_W-1:0]    m_axis_tstrb_reg  = '0;
@@ -206,6 +249,7 @@ logic                 temp_m_axis_tlast_reg  = 1'b0;
 logic [M_ID_W-1:0]    temp_m_axis_tid_reg    = '0;
 logic [M_DEST_W-1:0]  temp_m_axis_tdest_reg  = '0;
 logic [USER_W-1:0]    temp_m_axis_tuser_reg  = '0;
+`endif
 
 // datapath control
 logic store_axis_int_to_output;
