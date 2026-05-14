@@ -59,6 +59,8 @@ module taxi_axis_switch #
     taxi_axis_if.src   m_axis[M_COUNT]
 );
 
+wire rst_n = ~rst;
+
 
 `ifdef CADENCE
 // extract parameters
@@ -70,7 +72,7 @@ localparam logic LAST_EN = ($bits(s_axis[0].get_last_en) - 1) && ($bits(m_axis[0
 localparam logic ID_EN = ($bits(s_axis[0].get_id_en) - 1) && ($bits(m_axis[0].get_id_en) - 1);
 localparam S_ID_W = $bits(s_axis[0].tid);
 localparam logic DEST_EN = ($bits(s_axis[0].get_dest_en) - 1) && ($bits(m_axis[0].get_dest_en) - 1);
-localparam DEST_W = $bits(s_axis[0].tdest);
+localparam S_DEST_W = $bits(s_axis[0].tdest);
 localparam logic USER_EN = ($bits(s_axis[0].get_user_en) - 1) && ($bits(m_axis[0].get_user_en) - 1);
 localparam USER_W = $bits(s_axis[0].tuser);
 
@@ -185,12 +187,7 @@ for (genvar m = 0; m < S_COUNT; m = m + 1) begin : s_if
 
     // S side register
     taxi_axis_register #(
-        .REG_TYPE(S_REG_TYPE),
-        .KEEP_EN(KEEP_EN),
-        .STRB_EN(STRB_EN),
-        .ID_EN(ID_EN),
-        .DEST_EN(DEST_EN),
-        .USER_EN(USER_EN)
+        .REG_TYPE(S_REG_TYPE)
     )
     reg_inst (
         .clk(clk),
@@ -266,7 +263,7 @@ for (genvar m = 0; m < S_COUNT; m = m + 1) begin : s_if
         end
 
         `ifdef ASIC
-        always_ff @(posedge clk, nedgede rst_n) begin
+        always_ff @(posedge clk, negedge rst_n) begin
             if (!rst_n) begin
                 select_valid_reg <= 1'b0;
                 select_reg <= '0;
@@ -394,12 +391,7 @@ for (genvar n = 0; n < M_COUNT; n = n + 1) begin : m_if
 
     // M side register
     taxi_axis_register #(
-        .REG_TYPE(S_REG_TYPE),
-        .KEEP_EN(KEEP_EN),
-        .STRB_EN(STRB_EN),
-        .ID_EN(ID_EN),
-        .DEST_EN(DEST_EN),
-        .USER_EN(USER_EN)
+        .REG_TYPE(S_REG_TYPE)
     )
     reg_inst (
         .clk(clk),

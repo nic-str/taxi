@@ -84,6 +84,18 @@ module taxi_axis_fifo_adapter #
 );
 
 // extract parameters
+
+`ifdef CADENCE
+localparam S_DATA_W = $bits(s_axis.tdata);
+localparam logic S_KEEP_EN = ($bits(s_axis.get_keep_en) - 1);
+localparam S_KEEP_W = $bits(s_axis.tkeep);
+localparam logic S_STRB_EN = ($bits(s_axis.get_strb_en) - 1);
+
+localparam M_DATA_W = $bits(m_axis.tdata);
+localparam logic M_KEEP_EN = ($bits(m_axis.get_keep_en) - 1);
+localparam M_KEEP_W = $bits(m_axis.tkeep);
+localparam logic M_STRB_EN = ($bits(m_axis.get_strb_en) - 1);
+`else
 localparam S_DATA_W = s_axis.DATA_W;
 localparam logic S_KEEP_EN = s_axis.KEEP_EN;
 localparam S_KEEP_W = s_axis.KEEP_W;
@@ -93,6 +105,8 @@ localparam M_DATA_W = m_axis.DATA_W;
 localparam logic M_KEEP_EN = m_axis.KEEP_EN;
 localparam M_KEEP_W = m_axis.KEEP_W;
 localparam logic M_STRB_EN = m_axis.STRB_EN;
+`endif
+
 
 // force keep width to 1 when disabled
 localparam S_BYTE_LANES = S_KEEP_EN ? S_KEEP_W : 1;
