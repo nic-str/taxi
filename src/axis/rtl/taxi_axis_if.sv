@@ -44,12 +44,14 @@ interface taxi_axis_if #(
     logic tready;
 
     // Trick to get enable status via $bits: WIDTH = 2 -> enabled, WIDTH = 1 -> disabled
+    // verilator lint_off UNUSEDSIGNAL
     logic [ID_EN : 0] get_id_en = '0;
     logic [LAST_EN : 0] get_last_en = '0;
     logic [KEEP_EN : 0] get_keep_en = '0;
     logic [DEST_EN : 0] get_dest_en = '0;
     logic [USER_EN : 0] get_user_en = '0;
     logic [STRB_EN : 0] get_strb_en = '0;
+    // verilator lint_on UNUSEDSIGNAL
 
     modport src (
         output tdata,

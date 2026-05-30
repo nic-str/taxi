@@ -37,19 +37,19 @@ assign rst_n = ~rst;
 // extract parameters from interface
 `ifdef CADENCE
 localparam S_DATA_W = $bits(s_axis.tdata);
-localparam logic S_KEEP_EN = ($bits(s_axis.get_keep_en) - 1);
+localparam logic S_KEEP_EN = $bits(s_axis.get_keep_en) > 1;
 localparam S_KEEP_W = $bits(s_axis.tkeep);
-localparam logic STRB_EN = ($bits(s_axis.get_strb_en) - 1) && ($bits(m_axis.get_strb_en) - 1);
-localparam logic LAST_EN = ($bits(s_axis.get_last_en) - 1);
-localparam logic ID_EN = ($bits(s_axis.get_id_en) - 1) && ($bits(m_axis.get_id_en) - 1);
+localparam logic STRB_EN = ($bits(s_axis.get_strb_en) > 1) && ($bits(m_axis.get_strb_en) > 1);
+localparam logic LAST_EN = $bits(s_axis.get_last_en) > 1;
+localparam logic ID_EN = ($bits(s_axis.get_id_en) > 1) && ($bits(m_axis.get_id_en) > 1);
 localparam ID_W = $bits(s_axis.tid);
-localparam logic DEST_EN = ($bits(s_axis.get_dest_en) - 1) && ($bits(m_axis.get_dest_en) - 1);
+localparam logic DEST_EN = ($bits(s_axis.get_dest_en) > 1) && ($bits(m_axis.get_dest_en) > 1);
 localparam DEST_W = $bits(s_axis.tdest);
-localparam logic USER_EN = ($bits(s_axis.get_user_en) - 1) && ($bits(m_axis.get_user_en) - 1);
+localparam logic USER_EN = ($bits(s_axis.get_user_en) > 1) && ($bits(m_axis.get_user_en) > 1);
 localparam USER_W = $bits(s_axis.tuser);
 
 localparam M_DATA_W = $bits(m_axis.tdata);
-localparam logic M_KEEP_EN = ($bits(m_axis.get_keep_en) - 1);
+localparam logic M_KEEP_EN = $bits(m_axis.get_keep_en) > 1;
 localparam M_KEEP_W = $bits(m_axis.tkeep);
 `else
 localparam S_DATA_W = s_axis.DATA_W;
@@ -82,7 +82,7 @@ if (S_BYTE_SIZE * S_BYTE_LANES != S_DATA_W)
     $fatal(0, "Error: input data width not evenly divisible (instance %m)");
 
 if (M_BYTE_SIZE * M_BYTE_LANES != M_DATA_W)
-    $fatal(0, "Error: output data width not evenly divisible (instance %m)");
+    $fatal(0, "Error: output data width not evenly divisible (instance %m) %d %d", M_BYTE_SIZE * M_BYTE_LANES, M_DATA_W);
 
 if (S_BYTE_SIZE != M_BYTE_SIZE)
     $fatal(0, "Error: byte size mismatch (instance %m) %d %d",S_BYTE_SIZE,M_BYTE_SIZE);

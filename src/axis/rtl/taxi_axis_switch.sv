@@ -65,15 +65,15 @@ wire rst_n = ~rst;
 `ifdef CADENCE
 // extract parameters
 localparam DATA_W = $bits(s_axis[0].tdata);
-localparam logic KEEP_EN = ($bits(s_axis[0].get_keep_en) - 1) && ($bits(m_axis[0].get_keep_en) - 1);
+localparam logic KEEP_EN = ($bits(s_axis[0].get_keep_en) > 1) && ($bits(m_axis[0].get_keep_en) > 1);
 localparam KEEP_W = $bits(s_axis[0].tkeep);
-localparam logic STRB_EN = ($bits(s_axis[0].get_strb_en) - 1) && ($bits(m_axis[0].get_strb_en) - 1);
-localparam logic LAST_EN = ($bits(s_axis[0].get_last_en) - 1) && ($bits(m_axis[0].get_last_en) - 1);
-localparam logic ID_EN = ($bits(s_axis[0].get_id_en) - 1) && ($bits(m_axis[0].get_id_en) - 1);
+localparam logic STRB_EN = ($bits(s_axis[0].get_strb_en) > 1) && ($bits(m_axis[0].get_strb_en) > 1);
+localparam logic LAST_EN = ($bits(s_axis[0].get_last_en) > 1) && ($bits(m_axis[0].get_last_en) > 1);
+localparam logic ID_EN = ($bits(s_axis[0].get_id_en) > 1) && ($bits(m_axis[0].get_id_en) > 1);
 localparam S_ID_W = $bits(s_axis[0].tid);
-localparam logic DEST_EN = ($bits(s_axis[0].get_dest_en) - 1) && ($bits(m_axis[0].get_dest_en) - 1);
+localparam logic DEST_EN = ($bits(s_axis[0].get_dest_en) > 1) && ($bits(m_axis[0].get_dest_en) > 1);
 localparam S_DEST_W = $bits(s_axis[0].tdest);
-localparam logic USER_EN = ($bits(s_axis[0].get_user_en) - 1) && ($bits(m_axis[0].get_user_en) - 1);
+localparam logic USER_EN = ($bits(s_axis[0].get_user_en) > 1) && ($bits(m_axis[0].get_user_en) > 1);
 localparam USER_W = $bits(s_axis[0].tuser);
 
 localparam M_ID_W = $bits(m_axis[0].tid);

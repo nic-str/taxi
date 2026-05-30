@@ -49,15 +49,15 @@ module taxi_axis_demux #
 // extract parameters
 `ifdef CADENCE
 localparam DATA_W = $bits(s_axis.tdata);
-localparam logic KEEP_EN = ($bits(s_axis.get_keep_en) - 1) && ($bits(m_axis[0].get_keep_en) - 1);
+localparam logic KEEP_EN = ($bits(s_axis.get_keep_en) > 1) && ($bits(m_axis[0].get_keep_en) > 1);
 localparam KEEP_W = $bits(s_axis.tkeep);
-localparam logic STRB_EN = ($bits(s_axis.get_strb_en) - 1) && ($bits(m_axis[0].get_strb_en) - 1);
-localparam logic LAST_EN = ($bits(s_axis.get_last_en) - 1) && ($bits(m_axis[0].get_last_en) - 1);
-localparam logic ID_EN = ($bits(s_axis.get_id_en) - 1) && ($bits(m_axis[0].get_id_en) - 1);
+localparam logic STRB_EN = ($bits(s_axis.get_strb_en) > 1) && ($bits(m_axis[0].get_strb_en) > 1);
+localparam logic LAST_EN = ($bits(s_axis.get_last_en) > 1) && ($bits(m_axis[0].get_last_en) > 1);
+localparam logic ID_EN = ($bits(s_axis.get_id_en) > 1) && ($bits(m_axis[0].get_id_en) > 1);
 localparam ID_W = $bits(s_axis.tid);
-localparam logic DEST_EN = ($bits(s_axis.get_dest_en) - 1) && ($bits(m_axis[0].get_dest_en) - 1);
+localparam logic DEST_EN = ($bits(s_axis.get_dest_en) > 1) && ($bits(m_axis[0].get_dest_en) > 1);
 localparam DEST_W = $bits(s_axis.tdest);
-localparam logic USER_EN = ($bits(s_axis.get_user_en) - 1) && ($bits(m_axis[0].get_user_en) - 1);
+localparam logic USER_EN = ($bits(s_axis.get_user_en) > 1) && ($bits(m_axis[0].get_user_en) > 1);
 localparam USER_W = $bits(s_axis.tuser);
 `else
 localparam DATA_W = s_axis.DATA_W;

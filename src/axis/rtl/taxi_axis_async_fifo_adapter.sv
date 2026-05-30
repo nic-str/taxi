@@ -92,15 +92,55 @@ module taxi_axis_async_fifo_adapter #
 );
 
 // extract parameters
+`ifdef CADENCE
+localparam S_DATA_W = $bits(s_axis.tdata);
+localparam logic S_KEEP_EN = $bits(s_axis.get_keep_en) > 1;
+localparam S_KEEP_W = $bits(s_axis.tkeep);
+localparam logic S_STRB_EN = $bits(s_axis.get_strb_en) > 1;
+localparam logic S_LAST_EN = $bits(s_axis.get_last_en) > 1;
+localparam S_ID_W = $bits(s_axis.tid);
+localparam logic S_ID_EN = $bits(s_axis.get_id_en) > 1;
+localparam S_DEST_W = $bits(s_axis.tdest);
+localparam logic S_DEST_EN = $bits(s_axis.get_dest_en) > 1;
+localparam S_USER_W = $bits(s_axis.tuser);
+localparam logic S_USER_EN = $bits(s_axis.get_user_en) > 1;
+
+localparam M_DATA_W = $bits(m_axis.tdata);
+localparam logic M_KEEP_EN = $bits(m_axis.get_keep_en) > 1;
+localparam M_KEEP_W = $bits(m_axis.tkeep);
+localparam logic M_STRB_EN = $bits(m_axis.get_strb_en) > 1;
+localparam logic M_LAST_EN = $bits(m_axis.get_last_en) > 1;
+localparam M_ID_W = $bits(m_axis.tid);
+localparam logic M_ID_EN = $bits(m_axis.get_id_en) > 1;
+localparam M_DEST_W = $bits(m_axis.tdest);
+localparam logic M_DEST_EN = $bits(m_axis.get_dest_en) > 1;
+localparam M_USER_W = $bits(m_axis.tuser);
+localparam logic M_USER_EN = $bits(m_axis.get_user_en) > 1;
+`else
 localparam S_DATA_W = s_axis.DATA_W;
 localparam logic S_KEEP_EN = s_axis.KEEP_EN;
 localparam S_KEEP_W = s_axis.KEEP_W;
 localparam logic S_STRB_EN = s_axis.STRB_EN;
+localparam logic S_LAST_EN = s_axis.LAST_EN;
+localparam S_ID_W = s_axis.ID_W;
+localparam logic S_ID_EN = s_axis.ID_EN;
+localparam S_DEST_W = s_axis.DEST_W;
+localparam logic S_DEST_EN = s_axis.DEST_EN;
+localparam S_USER_W = s_axis.USER_W;
+localparam logic S_USER_EN = s_axis.USER_EN;
 
 localparam M_DATA_W = m_axis.DATA_W;
 localparam logic M_KEEP_EN = m_axis.KEEP_EN;
 localparam M_KEEP_W = m_axis.KEEP_W;
 localparam logic M_STRB_EN = m_axis.STRB_EN;
+localparam logic M_LAST_EN = m_axis.LAST_EN;
+localparam M_ID_W = m_axis.ID_W;
+localparam logic M_ID_EN = m_axis.ID_EN;
+localparam M_DEST_W = m_axis.DEST_W;
+localparam logic M_DEST_EN = m_axis.DEST_EN;
+localparam M_USER_W = m_axis.USER_W;
+localparam logic M_USER_EN = m_axis.USER_EN;
+`endif
 
 // force keep width to 1 when disabled
 localparam S_BYTE_LANES = S_KEEP_EN ? S_KEEP_W : 1;
@@ -131,28 +171,28 @@ taxi_axis_if #(
     .DATA_W(DATA_W),
     .KEEP_EN(KEEP_EN),
     .KEEP_W(KEEP_W),
-    .STRB_EN(s_axis.STRB_EN),
-    .LAST_EN(s_axis.LAST_EN),
-    .ID_EN(s_axis.ID_EN),
-    .ID_W(s_axis.ID_W),
-    .DEST_EN(s_axis.DEST_EN),
-    .DEST_W(s_axis.DEST_W),
-    .USER_EN(s_axis.USER_EN),
-    .USER_W(s_axis.USER_W)
+    .STRB_EN(S_STRB_EN),
+    .LAST_EN(S_LAST_EN),
+    .ID_EN(S_ID_EN),
+    .ID_W(S_ID_W),
+    .DEST_EN(S_DEST_EN),
+    .DEST_W(S_DEST_W),
+    .USER_EN(S_USER_EN),
+    .USER_W(S_USER_W)
 ) axis_pre_fifo();
 
 taxi_axis_if #(
     .DATA_W(DATA_W),
     .KEEP_EN(KEEP_EN),
     .KEEP_W(KEEP_W),
-    .STRB_EN(m_axis.STRB_EN),
-    .LAST_EN(m_axis.LAST_EN),
-    .ID_EN(m_axis.ID_EN),
-    .ID_W(m_axis.ID_W),
-    .DEST_EN(m_axis.DEST_EN),
-    .DEST_W(m_axis.DEST_W),
-    .USER_EN(m_axis.USER_EN),
-    .USER_W(m_axis.USER_W)
+    .STRB_EN(M_STRB_EN),
+    .LAST_EN(M_LAST_EN),
+    .ID_EN(M_ID_EN),
+    .ID_W(M_ID_W),
+    .DEST_EN(M_DEST_EN),
+    .DEST_W(M_DEST_W),
+    .USER_EN(M_USER_EN),
+    .USER_W(M_USER_W)
 ) axis_post_fifo();
 
 taxi_axis_adapter

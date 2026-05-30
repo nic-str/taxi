@@ -102,16 +102,16 @@ assign s_rst_n = ~s_rst;
 // extract parameters
 `ifdef CADENCE
 localparam DATA_W = $bits(s_axis.tdata);
-localparam logic KEEP_EN = ($bits(s_axis.get_keep_en) - 1) && ($bits(m_axis.get_keep_en) - 1);
+localparam logic KEEP_EN = ($bits(s_axis.get_keep_en) > 1) && ($bits(m_axis.get_keep_en) > 1);
 localparam KEEP_W = $bits(s_axis.tkeep);
-localparam logic STRB_EN = ($bits(s_axis.get_strb_en) - 1) && ($bits(m_axis.get_strb_en) - 1);
-localparam logic LAST_EN = ($bits(s_axis.get_last_en) - 1) && ($bits(m_axis.get_last_en) - 1);
-localparam logic ID_EN = ($bits(s_axis.get_id_en) - 1) && ($bits(m_axis.get_id_en) - 1);
+localparam logic STRB_EN = ($bits(s_axis.get_strb_en) > 1) && ($bits(m_axis.get_strb_en) > 1);
+localparam logic LAST_EN = ($bits(s_axis.get_last_en) > 1) && ($bits(m_axis.get_last_en) > 1);
+localparam logic ID_EN = ($bits(s_axis.get_id_en) > 1) && ($bits(m_axis.get_id_en) > 1);
 localparam ID_W = $bits(s_axis.tid);
-localparam logic DEST_EN = ($bits(s_axis.get_dest_en) - 1) && ($bits(m_axis.get_dest_en) - 1);
+localparam logic DEST_EN = ($bits(s_axis.get_dest_en) > 1) && ($bits(m_axis.get_dest_en) > 1);
 localparam DEST_W = $bits(s_axis.tdest);
-localparam S_USER_EN = ($bits(s_axis.get_user_en) - 1);
-localparam logic USER_EN = S_USER_EN && ($bits(m_axis.get_user_en) - 1);
+localparam logic S_USER_EN = $bits(s_axis.get_user_en) > 1;
+localparam logic USER_EN = S_USER_EN && ($bits(m_axis.get_user_en) > 1);
 localparam USER_W = $bits(s_axis.tuser);
 `else
 localparam DATA_W = s_axis.DATA_W;
@@ -123,7 +123,7 @@ localparam logic ID_EN = s_axis.ID_EN && m_axis.ID_EN;
 localparam ID_W = s_axis.ID_W;
 localparam logic DEST_EN = s_axis.DEST_EN && m_axis.DEST_EN;
 localparam DEST_W = s_axis.DEST_W;
-localparam S_USER_EN = s_axis.USER_EN;
+localparam logic S_USER_EN = s_axis.USER_EN;
 localparam logic USER_EN = S_USER_EN && m_axis.USER_EN;
 localparam USER_W = s_axis.USER_W;
 `endif
