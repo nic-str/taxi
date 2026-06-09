@@ -44,14 +44,12 @@ interface taxi_axis_if #(
     logic tready;
 
     // Trick to get enable status via $bits: WIDTH = 2 -> enabled, WIDTH = 1 -> disabled
-    // verilator lint_off UNUSEDSIGNAL
-    logic [ID_EN : 0] get_id_en = '0;
-    logic [LAST_EN : 0] get_last_en = '0;
-    logic [KEEP_EN : 0] get_keep_en = '0;
-    logic [DEST_EN : 0] get_dest_en = '0;
-    logic [USER_EN : 0] get_user_en = '0;
-    logic [STRB_EN : 0] get_strb_en = '0;
-    // verilator lint_on UNUSEDSIGNAL
+    localparam logic [ID_EN : 0] get_id_en = '0;
+    localparam logic [LAST_EN : 0] get_last_en = '0;
+    localparam logic [KEEP_EN : 0] get_keep_en = '0;
+    localparam logic [DEST_EN : 0] get_dest_en = '0;
+    localparam logic [USER_EN : 0] get_user_en = '0;
+    localparam logic [STRB_EN : 0] get_strb_en = '0;
 
     modport src (
         output tdata,
@@ -62,14 +60,7 @@ interface taxi_axis_if #(
         output tuser,
         output tlast,
         output tvalid,
-        input  tready,
-
-        input get_id_en,
-        input get_last_en,
-        input get_keep_en,
-        input get_dest_en,
-        input get_user_en,
-        input get_strb_en
+        input  tready
     );
 
     modport snk (
@@ -81,14 +72,7 @@ interface taxi_axis_if #(
         input  tuser,
         input  tlast,
         input  tvalid,
-        output tready,
-
-        input get_id_en,
-        input get_last_en,
-        input get_keep_en,
-        input get_dest_en,
-        input get_user_en,
-        input get_strb_en
+        output tready
     );
 
     modport mon (
@@ -100,14 +84,7 @@ interface taxi_axis_if #(
         input  tuser,
         input  tlast,
         input  tvalid,
-        input  tready,
-
-        input get_id_en,
-        input get_last_en,
-        input get_keep_en,
-        input get_dest_en,
-        input get_user_en,
-        input get_strb_en
+        input  tready
     );
 
 endinterface
