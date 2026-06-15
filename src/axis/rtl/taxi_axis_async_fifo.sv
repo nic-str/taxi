@@ -22,14 +22,14 @@ module taxi_axis_async_fifo #
     // Rounded up to nearest power of 2 cycles
     parameter DEPTH = 4096,
     // FIFO ramstyle attribute
-    parameter FIFO_RAMSTYLE = "auto",
+    // parameter FIFO_RAMSTYLE = "auto",
     // number of RAM pipeline registers
     parameter RAM_PIPELINE = 1,
     // use output FIFO
     // When set, the RAM read enable and pipeline clock enables are removed
     parameter logic OUTPUT_FIFO_EN = 1'b0,
     // output FIFO ramstyle attribute
-    parameter OUTPUT_FIFO_RAMSTYLE = "distributed",
+    // parameter OUTPUT_FIFO_RAMSTYLE = "distributed",
     // Frame FIFO mode - operate on frames instead of cycles
     // When set, m_axis_tvalid will not be deasserted within a frame
     // Requires LAST_EN set
@@ -508,6 +508,7 @@ always_ff @(posedge s_clk) begin
         end
     end
 
+    /* verilator lint_off BLKSEQ */
     if (FRAME_FIFO) begin
         // frame FIFO mode
         if (s_axis.tready && s_axis.tvalid) begin
@@ -659,6 +660,7 @@ always_ff @(posedge s_clk) begin
     end
     `endif
 end
+/* verilator lint_on BLKSEQ */
 
 // Write-side status
 always_ff @(posedge s_clk) begin
@@ -805,7 +807,9 @@ always_ff @(posedge m_clk) begin
         if (!empty && !m_rst_sync && !m_empty_pipe_reg && pipe_ready) begin
             // not empty, increment pointer
             mem_rd_valid_pipe_reg[0] <= 1'b1;
+            /* verilator lint_off BLKSEQ */
             rd_ptr_temp = rd_ptr_reg + 1;
+            /* verilator lint_on BLKSEQ */
             rd_ptr_reg <= rd_ptr_temp;
             rd_ptr_gray_reg <= bin2gray(rd_ptr_temp);;
         end
