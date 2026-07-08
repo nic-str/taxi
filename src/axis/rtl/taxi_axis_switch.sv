@@ -115,7 +115,7 @@ localparam M_DEST_W_INT = M_DEST_W > 0 ? M_DEST_W : 1;
 if (M_DATA_W != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
-if (KEEP_EN && M_KEEP_W) != KEEP_W)
+if (KEEP_EN && M_KEEP_W != KEEP_W)
     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
 
 if (M_COUNT > 1) begin
