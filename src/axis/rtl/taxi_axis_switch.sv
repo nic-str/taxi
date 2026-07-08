@@ -78,6 +78,9 @@ localparam USER_W = $bits(s_axis[0].tuser);
 
 localparam M_ID_W = $bits(m_axis[0].tid);
 localparam M_DEST_W = $bits(m_axis[0].tdest);
+localparam M_DATA_W = $bits(m_axis[0].tdata);
+localparam M_KEEP_W = $bits(m_axis[0].tkeep);
+localparam M_USER_W = $bits(m_axis[0].tuser);
 
 `else
 // extract parameters
@@ -95,6 +98,9 @@ localparam USER_W = s_axis[0].USER_W;
 
 localparam M_ID_W = m_axis[0].ID_W;
 localparam M_DEST_W = m_axis[0].DEST_W;
+localparam M_DATA_W = m_axis[0].DATA_W;
+localparam M_KEEP_W = m_axis[0].KEEP_W;
+localparam M_USER_W = m_axis[0].USER_W;
 `endif
 
 localparam CL_S_COUNT = $clog2(S_COUNT);
@@ -106,10 +112,10 @@ localparam S_DEST_W_INT = S_DEST_W > 0 ? S_DEST_W : 1;
 localparam M_DEST_W_INT = M_DEST_W > 0 ? M_DEST_W : 1;
 
 // check configuration
-if ($bits(m_axis[0].tdata) != DATA_W)
+if (M_DATA_W != DATA_W)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
-if (KEEP_EN && $bits(m_axis[0].tkeep) != KEEP_W)
+if (KEEP_EN && M_KEEP_W) != KEEP_W)
     $fatal(0, "Error: Interface KEEP_W parameter mismatch (instance %m)");
 
 if (M_COUNT > 1) begin
@@ -310,17 +316,17 @@ end // s_if
 for (genvar n = 0; n < M_COUNT; n = n + 1) begin : m_if
 
     taxi_axis_if #(
-        .DATA_W($bits(m_axis[0].tdata)),
+        .DATA_W(M_DATA_W),
         .KEEP_EN(KEEP_EN),
-        .KEEP_W($bits(m_axis[0].tkeep)),
+        .KEEP_W(M_KEEP_W),
         .STRB_EN(STRB_EN),
         .LAST_EN(LAST_EN),
         .ID_EN(ID_EN),
-        .ID_W($bits(m_axis[0].tid)),
+        .ID_W(M_ID_W),
         .DEST_EN(DEST_EN),
-        .DEST_W($bits(m_axis[0].tdest)),
+        .DEST_W(M_DEST_W),
         .USER_EN(USER_EN),
-        .USER_W($bits(m_axis[0].tuser))
+        .USER_W(M_USER_W)
     ) int_axis();
 
     if (S_COUNT == 1) begin
